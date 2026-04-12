@@ -1,7 +1,12 @@
+import dotenv from 'dotenv'
+
+dotenv.config({ path: '.env.test' })
+dotenv.config() // also load .env as fallback
+
 import { PrismaClient } from '@prisma/client'
 
 export const prisma = new PrismaClient({
-  datasources: { db: { url: process.env.TEST_DATABASE_URL } },
+  datasources: { db: { url: process.env.DATABASE_URL } },
 })
 
 beforeAll(async () => {

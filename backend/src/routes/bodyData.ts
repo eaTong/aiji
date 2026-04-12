@@ -1,16 +1,22 @@
 import Router from '@koa/router'
-import { Context } from 'koa'
 import { authMiddleware } from '../middleware/auth'
+import {
+  createWeightRecord_ctrl as createWeightRecord,
+  getWeightRecords_ctrl as getWeightRecords,
+  createMeasurementRecord_ctrl as createMeasurementRecord,
+  getMeasurementRecords_ctrl as getMeasurementRecords,
+  uploadProgressPhoto,
+  getProgressPhotos_ctrl as getProgressPhotos,
+} from '../controllers/bodyDataController'
 
 const router = new Router({ prefix: '/api/body-data' })
 router.use(authMiddleware)
 
-// Placeholder routes - full implementation in Task 7
-router.post('/weight', async (ctx: Context) => { ctx.body = { code: 0, message: 'ok', data: null } })
-router.get('/weight', async (ctx: Context) => { ctx.body = { code: 0, message: 'ok', data: { records: [] } } })
-router.post('/measurements', async (ctx: Context) => { ctx.body = { code: 0, message: 'ok', data: null } })
-router.get('/measurements', async (ctx: Context) => { ctx.body = { code: 0, message: 'ok', data: [] } })
-router.post('/photos', async (ctx: Context) => { ctx.body = { code: 0, message: 'ok', data: null } })
-router.get('/photos', async (ctx: Context) => { ctx.body = { code: 0, message: 'ok', data: [] } })
+router.post('/weight', createWeightRecord)
+router.get('/weight', getWeightRecords)
+router.post('/measurements', createMeasurementRecord)
+router.get('/measurements', getMeasurementRecords)
+router.post('/photos', uploadProgressPhoto)
+router.get('/photos', getProgressPhotos)
 
 export default router
