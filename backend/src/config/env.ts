@@ -13,5 +13,9 @@ export const env = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
   wxAppId: requireEnv('WX_APPID'),
   wxSecret: requireEnv('WX_SECRET'),
-  port: Number(process.env.PORT ?? 3000),
+  port: (() => {
+  const p = process.env.PORT ? Number(process.env.PORT) : 3000
+  if (isNaN(p)) throw new Error('PORT must be a valid number')
+  return p
+})(),
 }
