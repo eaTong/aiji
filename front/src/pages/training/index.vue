@@ -1,14 +1,8 @@
 <template>
-  <view class="container">
-    <text>训练页面</text>
+  <view class="placeholder">
+    <text>训练（Phase 2 实现）</text>
   </view>
 </template>
-
-<script setup lang="ts">
-</script>
-
-<style scoped>
-.container {
-  padding: 20px;
-}
+<style>
+.placeholder { display: flex; align-items: center; justify-content: center; height: 100vh; font-size: 32rpx; color: #ccc; }
 </style>
