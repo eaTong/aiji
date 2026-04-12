@@ -13,7 +13,8 @@ export async function authMiddleware(ctx: Context, next: Next) {
     const payload = jwt.verify(token, env.jwtSecret) as { userId: string }
     ctx.state.user = { userId: payload.userId }
     await next()
-  } catch {
+  } catch (err) {
+    console.error('[JWT Verify Error]', (err as Error).message)
     ctx.status = 401
     ctx.body = { code: 401, message: 'Token 无效或已过期', data: null }
   }
