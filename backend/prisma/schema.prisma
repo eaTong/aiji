@@ -1,0 +1,102 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String    @id @default(uuid())
+  openid            String    @unique
+  nickname          String?
+  avatarUrl         String?
+  height            Float?
+  targetWeight      Float?
+  goal              Goal?
+  level             Level     @default(BEGINNER)
+  equipment         Equipment @default(GYM)
+  weeklyTrainingDays Int      @default(3)
+  currentPhase      Phase     @default(MAINTAIN)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  weightRecords      WeightRecord[]
+  measurementRecords MeasurementRecord[]
+  progressPhotos     ProgressPhoto[]
+}
+
+model WeightRecord {
+  id         String   @id @default(uuid())
+  userId     String
+  weight     Float
+  recordedAt DateTime @db.Date
+  note       String?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, recordedAt])
+}
+
+model MeasurementRecord {
+  id          String   @id @default(uuid())
+  userId      String
+  waist       Float?
+  hip         Float?
+  chest       Float?
+  leftArm     Float?
+  rightArm    Float?
+  leftThigh   Float?
+  rightThigh  Float?
+  leftCalf    Float?
+  rightCalf   Float?
+  bodyFat     Float?
+  recordedAt  DateTime @db.Date
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model ProgressPhoto {
+  id         String      @id @default(uuid())
+  userId     String
+  photoUrl   String
+  angle      PhotoAngle
+  recordedAt DateTime    @db.Date
+  createdAt  DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+enum Goal {
+  LOSE_FAT
+  GAIN_MUSCLE
+  BODY_SHAPE
+  IMPROVE_FITNESS
+}
+
+enum Level {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum Equipment {
+  GYM
+  DUMBBELL
+  BODYWEIGHT
+}
+
+enum Phase {
+  CUT
+  BULK
+  MAINTAIN
+}
+
+enum PhotoAngle {
+  FRONT
+  SIDE
+  BACK
+}
