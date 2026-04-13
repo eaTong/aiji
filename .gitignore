@@ -47,3 +47,5 @@ front/node_modules/
 *.local
 .turbo/
 .nyc_output/
+
+scripts/import-free-exercises-db/.superpowers/

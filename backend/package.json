@@ -13,7 +13,11 @@
     "prisma:migrate:reset": "prisma migrate reset",
     "prisma:deploy": "prisma migrate deploy",
     "db:setup": "prisma generate && prisma migrate dev",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:seed": "ts-node prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   },
   "keywords": [],
   "author": "",

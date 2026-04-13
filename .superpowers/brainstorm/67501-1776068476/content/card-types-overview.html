@@ -1,0 +1,462 @@
+<style>
+.intro { margin-bottom: 32px; }
+.category { margin-bottom: 40px; }
+.category-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #888;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eee;
+}
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.chat-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  border: 1.5px solid #e8e8e8;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+.chat-card:hover {
+  border-color: #bbb;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+}
+.chat-card.selected {
+  border-color: #333;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.12);
+}
+.card-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  margin-bottom: 10px;
+}
+.tag-data { background: #e8f4fd; color: #1a6fa8; }
+.tag-training { background: #fff0e6; color: #c05500; }
+.tag-ai { background: #f0f7ee; color: #2d7a1f; }
+.tag-social { background: #f5f0ff; color: #5b3fa6; }
+.tag-action { background: #fff8e0; color: #9a6800; }
+.card-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 4px;
+}
+.card-desc {
+  font-size: 13px;
+  color: #777;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+.card-preview {
+  background: #f7f7f7;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 12px;
+  color: #555;
+}
+/* 各种卡片预览的mini样式 */
+.mini-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.mini-label { color: #999; font-size: 11px; }
+.mini-val { font-weight: 700; color: #222; font-size: 12px; }
+.mini-bar { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; margin-top: 6px; }
+.mini-fill { height: 100%; background: #333; border-radius: 3px; }
+.mini-chip { display: inline-block; background: #333; color: #fff; border-radius: 20px; padding: 2px 8px; font-size: 10px; margin: 2px; }
+.mini-chip.outline { background: #fff; color: #333; border: 1px solid #333; }
+.mini-stat { text-align: center; }
+.mini-stat-val { font-size: 20px; font-weight: 800; color: #222; }
+.mini-stat-label { font-size: 10px; color: #999; }
+.heat-grid { display: flex; gap: 4px; flex-wrap: wrap; }
+.heat-cell { width: 24px; height: 24px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #fff; font-weight: 600; }
+.mini-btn-row { display: flex; gap: 6px; margin-top: 8px; }
+.mini-btn { flex: 1; padding: 5px; text-align: center; border-radius: 8px; font-size: 10px; font-weight: 600; }
+.mini-btn.primary { background: #222; color: #fff; }
+.mini-btn.secondary { background: #f0f0f0; color: #555; }
+.mini-chart { height: 40px; position: relative; overflow: hidden; }
+.chart-line { position: absolute; bottom: 0; left: 0; right: 0; }
+.mini-ex-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #eee; }
+.mini-badge { background: #f5f5f5; border-radius: 6px; padding: 4px 8px; font-size: 11px; display: inline-block; }
+.fire-row { display: flex; align-items: center; gap: 6px; }
+.fire-icon { font-size: 18px; }
+.fire-text { font-size: 12px; font-weight: 700; color: #222; }
+.fire-sub { font-size: 10px; color: #999; }
+</style>
+
+<h2>AI 己 · 对话卡片类型全景</h2>
+<p class="subtitle">点击你认为需要支持的卡片类型（可多选）</p>
+
+<div class="category">
+  <div class="category-title">📊 数据记录类</div>
+  <div class="card-grid">
+
+    <!-- 体重记录卡 -->
+    <div class="chat-card" data-choice="weight-record" onclick="toggleSelect(this)">
+      <span class="card-tag tag-data">数据</span>
+      <div class="card-name">体重快录卡</div>
+      <div class="card-desc">AI 解析后展示输入框，用户确认一键保存</div>
+      <div class="card-preview">
+        <div class="mini-row">
+          <span class="mini-label">今日体重</span>
+          <span class="mini-val">72.5 kg</span>
+        </div>
+        <div class="mini-row">
+          <span class="mini-label">7日均值</span>
+          <span class="mini-val">72.8 kg</span>
+        </div>
+        <div class="mini-row">
+          <span class="mini-label">与昨日</span>
+          <span class="mini-val" style="color:#07c160">▼ 0.3kg</span>
+        </div>
+        <div class="mini-btn-row">
+          <div class="mini-btn primary">保存记录</div>
+          <div class="mini-btn secondary">修改</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 围度记录卡 -->
+    <div class="chat-card" data-choice="measurement-record" onclick="toggleSelect(this)">
+      <span class="card-tag tag-data">数据</span>
+      <div class="card-name">围度快录卡</div>
+      <div class="card-desc">多部位围度一次性录入，含变化对比</div>
+      <div class="card-preview">
+        <div class="mini-ex-row"><span>腰围</span><span class="mini-val">80 cm <span style="color:#07c160;font-size:10px">▼1cm</span></span></div>
+        <div class="mini-ex-row"><span>胸围</span><span class="mini-val">98 cm</span></div>
+        <div class="mini-ex-row"><span>臀围</span><span class="mini-val">94 cm</span></div>
+        <div class="mini-btn-row">
+          <div class="mini-btn primary">全部保存</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 体重趋势卡 -->
+    <div class="chat-card" data-choice="weight-trend" onclick="toggleSelect(this)">
+      <span class="card-tag tag-data">数据</span>
+      <div class="card-name">体重趋势图卡</div>
+      <div class="card-desc">AI 回答"我最近体重怎么样"时展示折线图</div>
+      <div class="card-preview">
+        <div class="mini-row">
+          <span class="mini-label">最近30天</span>
+          <span style="color:#07c160;font-size:11px;font-weight:700">▼ 1.8kg</span>
+        </div>
+        <svg width="100%" height="48" style="display:block;margin:6px 0">
+          <polyline points="0,40 30,36 60,38 90,30 120,28 150,24 180,20 210,18" fill="none" stroke="#333" stroke-width="2"/>
+          <polyline points="0,40 30,37 60,37 90,32 120,30 150,27 180,23 210,20" fill="none" stroke="#bbb" stroke-width="1" stroke-dasharray="3,3"/>
+        </svg>
+        <div style="font-size:10px;color:#999;display:flex;justify-content:space-between">
+          <span>3/14</span><span>3/21</span><span>3/28</span><span>4/7</span><span>4/13</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="category">
+  <div class="category-title">💪 训练类</div>
+  <div class="card-grid">
+
+    <!-- 训练推荐卡 -->
+    <div class="chat-card" data-choice="training-recommend" onclick="toggleSelect(this)">
+      <span class="card-tag tag-training">训练</span>
+      <div class="card-name">今日训练推荐卡</div>
+      <div class="card-desc">AI 推荐今日训练计划，含动作列表和推荐理由</div>
+      <div class="card-preview">
+        <div class="mini-row" style="margin-bottom:6px">
+          <span style="font-weight:700;font-size:13px">胸部力量训练</span>
+          <span class="mini-badge">45分钟</span>
+        </div>
+        <div class="mini-ex-row"><span>杠铃卧推</span><span class="mini-label">4×8-10</span></div>
+        <div class="mini-ex-row"><span>哑铃上斜</span><span class="mini-label">3×10-12</span></div>
+        <div class="mini-ex-row"><span>蝴蝶机夹胸</span><span class="mini-label">3×12-15</span></div>
+        <div style="font-size:11px;color:#999;margin-top:6px">💡 胸肌已恢复3天，状态良好</div>
+        <div class="mini-btn-row">
+          <div class="mini-btn primary">开始训练</div>
+          <div class="mini-btn secondary">换一个</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 训练记录可编辑卡 -->
+    <div class="chat-card" data-choice="training-editable" onclick="toggleSelect(this)">
+      <span class="card-tag tag-training">训练</span>
+      <div class="card-name">训练记录可编辑卡</div>
+      <div class="card-desc">AI 解析训练描述后生成可编辑表格，用户调整后保存</div>
+      <div class="card-preview">
+        <div style="font-size:11px;color:#888;margin-bottom:4px">📅 2026-04-13 胸部训练</div>
+        <div class="mini-ex-row" style="font-size:10px;color:#aaa;font-weight:600">
+          <span>动作</span><span>组×次</span><span>重量</span>
+        </div>
+        <div class="mini-ex-row"><span>杠铃卧推</span><span>4×10</span><span>60kg</span></div>
+        <div class="mini-ex-row"><span>哑铃上斜</span><span>3×12</span><span>28kg</span></div>
+        <div class="mini-btn-row">
+          <div class="mini-btn secondary">取消</div>
+          <div class="mini-btn primary">保存记录</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 恢复状态卡 -->
+    <div class="chat-card" data-choice="recovery-status" onclick="toggleSelect(this)">
+      <span class="card-tag tag-training">训练</span>
+      <div class="card-name">肌群恢复状态卡</div>
+      <div class="card-desc">展示各肌群当前恢复百分比和今日训练建议</div>
+      <div class="card-preview">
+        <div class="mini-row" style="margin-bottom:8px">
+          <span style="font-weight:700;font-size:18px">78</span>
+          <span class="mini-badge" style="background:#e8f5e9;color:#2d7a1f">适合训练</span>
+        </div>
+        <div class="heat-grid">
+          <div class="heat-cell" style="background:#c8e6c9">胸<br/><span style="font-size:8px">92%</span></div>
+          <div class="heat-cell" style="background:#c8e6c9">背<br/><span style="font-size:8px">88%</span></div>
+          <div class="heat-cell" style="background:#ffccbc">腿<br/><span style="font-size:8px">45%</span></div>
+          <div class="heat-cell" style="background:#ffe0b2">肩<br/><span style="font-size:8px">65%</span></div>
+          <div class="heat-cell" style="background:#c8e6c9">臂<br/><span style="font-size:8px">95%</span></div>
+          <div class="heat-cell" style="background:#c8e6c9">核<br/><span style="font-size:8px">100%</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 动作详情卡 -->
+    <div class="chat-card" data-choice="exercise-detail" onclick="toggleSelect(this)">
+      <span class="card-tag tag-training">训练</span>
+      <div class="card-name">动作百科卡</div>
+      <div class="card-desc">用户问"怎么做引体向上"时，展示动作说明和注意事项</div>
+      <div class="card-preview">
+        <div style="font-weight:700;font-size:13px;margin-bottom:4px">引体向上</div>
+        <div style="font-size:11px;color:#666;margin-bottom:6px">Pull-up · 背部 · 自重</div>
+        <div style="font-size:11px;color:#555;line-height:1.5;margin-bottom:6px">双手握杠略宽于肩，核心收紧，用背阔肌发力...</div>
+        <div>
+          <span class="mini-chip">背阔肌</span>
+          <span class="mini-chip">肱二头肌</span>
+          <span class="mini-chip outline">核心</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 个人记录卡 -->
+    <div class="chat-card" data-choice="personal-record" onclick="toggleSelect(this)">
+      <span class="card-tag tag-training">训练</span>
+      <div class="card-name">个人记录 / PR 卡</div>
+      <div class="card-desc">突破个人最佳时自动弹出，含历史 e1RM 趋势</div>
+      <div class="card-preview">
+        <div class="fire-row" style="margin-bottom:8px">
+          <span class="fire-icon">🏆</span>
+          <div>
+            <div class="fire-text">杠铃卧推 新纪录！</div>
+            <div class="fire-sub">e1RM 估算 92.5kg</div>
+          </div>
+        </div>
+        <div class="mini-row">
+          <span class="mini-label">本次</span><span class="mini-val">80kg × 8</span>
+        </div>
+        <div class="mini-row">
+          <span class="mini-label">上次PR</span><span class="mini-val">78kg × 8</span>
+        </div>
+        <svg width="100%" height="30" style="display:block;margin:6px 0">
+          <polyline points="0,25 40,22 80,20 120,18 160,15 200,10" fill="none" stroke="#333" stroke-width="2"/>
+        </svg>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="category">
+  <div class="category-title">🤖 AI 分析类</div>
+  <div class="card-grid">
+
+    <!-- 早安日报卡 -->
+    <div class="chat-card" data-choice="morning-report" onclick="toggleSelect(this)">
+      <span class="card-tag tag-ai">AI分析</span>
+      <div class="card-name">早安日报卡</div>
+      <div class="card-desc">每日主动推送：昨日数据总结 + 今日计划预览</div>
+      <div class="card-preview">
+        <div style="font-weight:700;font-size:13px;margin-bottom:6px">早安！今天是训练日 💪</div>
+        <div class="mini-ex-row"><span class="mini-label">昨日体重</span><span class="mini-val">72.5kg ▼0.3</span></div>
+        <div class="mini-ex-row"><span class="mini-label">昨日容量</span><span class="mini-val">8,400kg</span></div>
+        <div style="background:#f5f5f5;border-radius:8px;padding:8px;margin-top:6px;font-size:11px">
+          📋 今日计划：背部 + 二头<br/>
+          <span style="color:#999">预计时长 50 分钟</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 周报卡 -->
+    <div class="chat-card" data-choice="weekly-report" onclick="toggleSelect(this)">
+      <span class="card-tag tag-ai">AI分析</span>
+      <div class="card-name">周报 / 月报卡</div>
+      <div class="card-desc">阶段性总结：训练次数、容量变化、体重趋势、AI点评</div>
+      <div class="card-preview">
+        <div style="font-weight:700;font-size:12px;margin-bottom:8px">本周训练报告 (4/7 - 4/13)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+          <div class="mini-stat"><div class="mini-stat-val">4</div><div class="mini-stat-label">训练次数</div></div>
+          <div class="mini-stat"><div class="mini-stat-val">32k</div><div class="mini-stat-label">总容量 kg</div></div>
+          <div class="mini-stat"><div class="mini-stat-val">▼0.8</div><div class="mini-stat-label">体重变化 kg</div></div>
+          <div class="mini-stat"><div class="mini-stat-val">3</div><div class="mini-stat-label">新PR数量</div></div>
+        </div>
+        <div style="font-size:11px;color:#666;background:#f9f9f9;padding:6px;border-radius:6px">💬 本周坚持性很好，建议下周增加腿部训练频率</div>
+      </div>
+    </div>
+
+    <!-- 目标进度卡 -->
+    <div class="chat-card" data-choice="goal-progress" onclick="toggleSelect(this)">
+      <span class="card-tag tag-ai">AI分析</span>
+      <div class="card-name">目标进度卡</div>
+      <div class="card-desc">展示减脂/增肌目标完成度，预测达标时间</div>
+      <div class="card-preview">
+        <div style="font-weight:700;font-size:12px;margin-bottom:8px">减脂目标进度</div>
+        <div class="mini-row">
+          <span class="mini-label">当前</span><span class="mini-val">72.5 kg</span>
+        </div>
+        <div class="mini-row">
+          <span class="mini-label">目标</span><span class="mini-val">68 kg</span>
+        </div>
+        <div style="margin:8px 0">
+          <div class="mini-bar"><div class="mini-fill" style="width:42%"></div></div>
+          <div style="font-size:10px;color:#999;text-align:right;margin-top:2px">已完成 42%</div>
+        </div>
+        <div style="font-size:11px;color:#555">📅 按当前速度，预计 6月下旬 达标</div>
+      </div>
+    </div>
+
+    <!-- 训练过度预警卡 -->
+    <div class="chat-card" data-choice="overtraining-warning" onclick="toggleSelect(this)">
+      <span class="card-tag tag-ai">AI分析</span>
+      <div class="card-name">过度训练预警卡</div>
+      <div class="card-desc">检测到疲劳信号时主动提示，给出调整建议</div>
+      <div class="card-preview">
+        <div class="fire-row" style="margin-bottom:8px">
+          <span style="font-size:20px">⚠️</span>
+          <div>
+            <div class="fire-text" style="color:#e05c00">注意：恢复不足</div>
+            <div class="fire-sub">连续5天高强度训练</div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:#666;line-height:1.5">腿部恢复仅 38%，建议今日安排主动恢复或休息</div>
+        <div class="mini-btn-row">
+          <div class="mini-btn secondary" style="font-size:10px">查看详情</div>
+          <div class="mini-btn primary" style="font-size:10px">好的，休息</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="category">
+  <div class="category-title">🎯 快捷操作类</div>
+  <div class="card-grid">
+
+    <!-- 选项确认卡 -->
+    <div class="chat-card" data-choice="option-choice" onclick="toggleSelect(this)">
+      <span class="card-tag tag-action">操作</span>
+      <div class="card-name">多选项确认卡</div>
+      <div class="card-desc">AI 引导用户在 2-4 个选项中快速决策</div>
+      <div class="card-preview">
+        <div style="font-size:12px;color:#555;margin-bottom:8px">你的训练目标是？</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <span class="mini-chip">💪 增肌</span>
+          <span class="mini-chip outline">🔥 减脂</span>
+          <span class="mini-chip outline">🎯 塑形</span>
+          <span class="mini-chip outline">🏃 体能</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 计划预览卡 -->
+    <div class="chat-card" data-choice="plan-preview" onclick="toggleSelect(this)">
+      <span class="card-tag tag-action">操作</span>
+      <div class="card-name">训练计划预览卡</div>
+      <div class="card-desc">AI 生成计划后的确认界面，含周视图概览</div>
+      <div class="card-preview">
+        <div style="font-weight:700;font-size:12px;margin-bottom:6px">增肌计划 · 4周 · 3天/周</div>
+        <div style="display:flex;gap:4px;margin-bottom:6px">
+          <div style="flex:1;background:#333;color:#fff;border-radius:4px;padding:3px;text-align:center;font-size:9px">周一<br/>胸+三头</div>
+          <div style="flex:1;background:#f0f0f0;border-radius:4px;padding:3px;text-align:center;font-size:9px">周二<br/>休息</div>
+          <div style="flex:1;background:#333;color:#fff;border-radius:4px;padding:3px;text-align:center;font-size:9px">周三<br/>背+二头</div>
+          <div style="flex:1;background:#f0f0f0;border-radius:4px;padding:3px;text-align:center;font-size:9px">周四<br/>休息</div>
+          <div style="flex:1;background:#333;color:#fff;border-radius:4px;padding:3px;text-align:center;font-size:9px">周五<br/>腿部</div>
+        </div>
+        <div class="mini-btn-row">
+          <div class="mini-btn secondary">重新生成</div>
+          <div class="mini-btn primary">确认采用</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 成就解锁卡 -->
+    <div class="chat-card" data-choice="achievement" onclick="toggleSelect(this)">
+      <span class="card-tag tag-action">激励</span>
+      <div class="card-name">成就解锁卡</div>
+      <div class="card-desc">完成里程碑时展示：连续打卡、容量突破等</div>
+      <div class="card-preview">
+        <div style="text-align:center;padding:8px 0">
+          <div style="font-size:36px">🏅</div>
+          <div style="font-weight:800;font-size:14px;margin:4px 0">解锁成就：坚持一个月</div>
+          <div style="font-size:11px;color:#999">连续打卡 30 天，你太厉害了！</div>
+          <div style="margin-top:8px;display:flex;justify-content:center;gap:8px">
+            <span class="mini-chip">📊 分享</span>
+            <span class="mini-chip outline">继续加油</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 饮食记录卡 -->
+    <div class="chat-card" data-choice="diet-record" onclick="toggleSelect(this)">
+      <span class="card-tag tag-action">操作</span>
+      <div class="card-name">饮食记录卡</div>
+      <div class="card-desc">AI 解析饮食描述后展示营养估算，用户确认保存</div>
+      <div class="card-preview">
+        <div style="font-size:12px;font-weight:700;margin-bottom:6px">🍽️ 午餐记录</div>
+        <div class="mini-ex-row"><span>白米饭 200g</span><span class="mini-label">232 kcal</span></div>
+        <div class="mini-ex-row"><span>鸡胸肉 150g</span><span class="mini-label">248 kcal</span></div>
+        <div class="mini-ex-row"><span>西兰花 100g</span><span class="mini-label">34 kcal</span></div>
+        <div style="border-top:1px solid #eee;margin-top:4px;padding-top:4px">
+          <div class="mini-row">
+            <span class="mini-label">总热量</span><span class="mini-val">514 kcal</span>
+          </div>
+          <div class="mini-row">
+            <span class="mini-label">蛋白质</span><span class="mini-val">52g</span>
+          </div>
+        </div>
+        <div class="mini-btn-row">
+          <div class="mini-btn primary">保存</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div style="margin-top:16px;padding:12px;background:#f9f9f9;border-radius:10px;font-size:12px;color:#888">
+  💡 点击卡片进行多选，选择后在终端告诉我你的想法或调整意见
+</div>
+
+<script>
+function toggleSelect(el) {
+  el.classList.toggle('selected');
+  // record event
+  const choice = el.dataset.choice;
+  const name = el.querySelector('.card-name').textContent;
+  try {
+    fetch('/__event', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({type:'click', choice, text: name})
+    });
+  } catch(e) {}
+}
+</script>
