@@ -2,6 +2,7 @@ import { PrismaClient, Prisma } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+// 肌群基准恢复时间（小时）
 const MUSCLE_RECOVERY_HOURS: Record<string, number> = {
   chest: 48,
   back: 48,
@@ -21,25 +22,48 @@ const MUSCLE_RECOVERY_HOURS: Record<string, number> = {
   rear_delts: 48,
 }
 
+// 肌群基准周容量（用于容量因子计算）
+// 基准值 = 每周该肌群累积约 5000kg 容量时，48h 后基本恢复
+const MUSCLE_BASELINE_VOLUME: Record<string, number> = {
+  chest: 5000,
+  back: 5000,
+  legs: 7000,       // 大肌群容量更大
+  shoulders: 3000,
+  arms: 2500,
+  core: 2000,
+  upper_chest: 3000,
+  lats: 4000,
+  quads: 6000,
+  hamstrings: 4000,
+  glutes: 4000,
+  triceps: 2000,
+  biceps: 2000,
+  abs: 1500,
+  side_delts: 2000,
+  rear_delts: 2000,
+}
+
 export type MuscleScores = Record<string, number>
 
-function parsePrimaryMuscles(muscles: unknown): string[] {
-  if (Array.isArray(muscles)) return muscles.map(String)
-  if (typeof muscles === 'string') {
-    try {
-      const parsed = JSON.parse(muscles)
-      return Array.isArray(parsed) ? parsed.map(String) : []
-    } catch {
-      return []
-    }
+function parseMuscles(m: unknown): string[] {
+  if (Array.isArray(m)) return m.map(String)
+  if (typeof m === 'string') {
+    try { return JSON.parse(m) } catch { return [] }
   }
   return []
 }
 
 /**
- * Compute muscle recovery scores from recent training logs (last 7 days)
- * For each muscle group: score = min(100, (hoursElapsed / recoveryHours) × 100)
- * If muscle was never trained in last 7 days → score = 100 (fully recovered)
+ * Compute muscle recovery scores from recent training logs (last 7 days).
+ *
+ * Volume-weighted recovery formula:
+ *   score = min(100, elapsedHours / (recoveryHours × volumeFactor) × 100)
+ *
+ * volumeFactor = clamp(totalVolume / baselineVolume, 0.5, 2.0)
+ * - 低容量训练 → volumeFactor < 1 → 恢复更快
+ * - 高容量训练 → volumeFactor > 1 → 恢复更慢
+ *
+ * 从未训练 → score = 100
  */
 export async function computeMuscleScores(
   userId: string,
@@ -47,46 +71,70 @@ export async function computeMuscleScores(
 ): Promise<MuscleScores> {
   const sevenDaysAgo = new Date(date.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-  // Get all completed log entries within the last 7 days
+  // Get all non-warmup entries in last 7 days
   const entries = await prisma.logEntry.findMany({
     where: {
       userId,
+      isWarmup: false,
       completedAt: { gte: sevenDaysAgo },
       trainingLog: { status: 'COMPLETED' },
     },
-    include: {
-      exercise: { select: { primaryMuscles: true } },
-    },
-    orderBy: { completedAt: 'desc' },
   })
 
-  // Build a map of muscle -> most recent training timestamp
+  // Accumulate volume per muscle: { muscle: totalVolume }
+  const muscleVolumes: Record<string, number> = {}
+  for (const entry of entries) {
+    const volumes = entry.muscleVolumes as Record<string, number> | null
+    if (!volumes) continue
+    for (const [muscle, vol] of Object.entries(volumes)) {
+      muscleVolumes[muscle] = (muscleVolumes[muscle] || 0) + vol
+    }
+  }
+
+  // Get most recent training timestamp per muscle
   const muscleLastTrained: Record<string, Date> = {}
   for (const entry of entries) {
-    const primaryMuscles = parsePrimaryMuscles(entry.exercise.primaryMuscles)
-    for (const muscle of primaryMuscles) {
-      const muscleLower = muscle.toLowerCase()
-      if (
-        !muscleLastTrained[muscleLower] ||
-        entry.completedAt > muscleLastTrained[muscleLower]
-      ) {
-        muscleLastTrained[muscleLower] = entry.completedAt
-      }
+    if (!muscleLastTrained[entry.exerciseId] || entry.completedAt > muscleLastTrained[entry.exerciseId]) {
+      muscleLastTrained[entry.exerciseId] = entry.completedAt
     }
   }
 
   // Calculate scores for all known muscles
   const scores: MuscleScores = {}
   for (const [muscle, recoveryHours] of Object.entries(MUSCLE_RECOVERY_HOURS)) {
-    const lastTrained = muscleLastTrained[muscle]
-    if (!lastTrained) {
-      // Never trained in last 7 days → fully recovered
+    const muscleLower = muscle.toLowerCase()
+    const totalVol = muscleVolumes[muscleLower] || 0
+    const lastTrained = muscleVolumes[muscleLower + '_at']
+
+    if (totalVol === 0) {
+      // 从未训练 → 完全恢复
       scores[muscle] = 100
-    } else {
-      const hoursElapsed =
-        (date.getTime() - lastTrained.getTime()) / (1000 * 60 * 60)
-      scores[muscle] = Math.min(100, (hoursElapsed / recoveryHours) * 100)
+      continue
     }
+
+    // Find most recent training timestamp for this specific muscle
+    let mostRecent: Date | null = null
+    for (const entry of entries) {
+      const volumes = entry.muscleVolumes as Record<string, number> | null
+      if (!volumes || !volumes[muscleLower]) continue
+      if (!mostRecent || entry.completedAt > mostRecent) {
+        mostRecent = entry.completedAt
+      }
+    }
+
+    if (!mostRecent) {
+      scores[muscle] = 100
+      continue
+    }
+
+    const hoursElapsed = (date.getTime() - mostRecent.getTime()) / (1000 * 60 * 60)
+
+    // Volume factor: clamp(totalVol / baseline, 0.5, 2.0)
+    const baseline = MUSCLE_BASELINE_VOLUME[muscle] || 5000
+    const volumeFactor = Math.max(0.5, Math.min(2.0, totalVol / baseline))
+
+    const score = (hoursElapsed / (recoveryHours * volumeFactor)) * 100
+    scores[muscle] = Math.min(100, Math.round(score * 10) / 10)
   }
 
   return scores

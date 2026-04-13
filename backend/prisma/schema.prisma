@@ -157,6 +157,7 @@ model LogEntry {
   reps          Int
   isWarmup      Boolean   @default(false)
   e1rm          Float?    // estimated 1RM (Epley formula)
+  muscleVolumes Json       // { "chest": 480, "triceps": 240, ... } 主肌群×1.0, 辅肌群×0.5
   completedAt   DateTime  @default(now())
   createdAt     DateTime  @default(now())
 

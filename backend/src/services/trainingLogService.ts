@@ -33,7 +33,45 @@ export async function startTraining(
 }
 
 /**
- * Add a single set entry to a training log
+ * Calculate muscle volumes for a given set.
+ * Primary muscles get 100% of volume (weight × reps),
+ * secondary muscles get 50%.
+ */
+function calcMuscleVolumes(
+  primaryMuscles: string[],
+  secondaryMuscles: string[],
+  weight: number,
+  reps: number,
+  isWarmup: boolean
+): Record<string, number> {
+  if (isWarmup) return {}
+  const setVolume = weight * reps
+  const volumes: Record<string, number> = {}
+  for (const m of primaryMuscles) {
+    volumes[m.toLowerCase()] = setVolume
+  }
+  for (const m of secondaryMuscles) {
+    const key = m.toLowerCase()
+    volumes[key] = (volumes[key] || 0) + setVolume * 0.5
+  }
+  // Round to 1 decimal
+  for (const k of Object.keys(volumes)) {
+    volumes[k] = Math.round(volumes[k] * 10) / 10
+  }
+  return volumes
+}
+
+function parseMuscles(m: unknown): string[] {
+  if (Array.isArray(m)) return m.map(String)
+  if (typeof m === 'string') {
+    try { return JSON.parse(m) } catch { return [] }
+  }
+  return []
+}
+
+/**
+ * Add a single set entry to a training log.
+ * Computes e1RM and muscle volumes from the associated exercise.
  */
 export async function addLogEntry(
   logId: string,
@@ -46,10 +84,27 @@ export async function addLogEntry(
 ): Promise<Prisma.LogEntryGetPayload<{}>> {
   const e1rm = !isWarmup && reps > 0 ? calcE1RM(weight, reps) : null
 
+  // Fetch exercise to get primary/secondary muscles
+  const exercise = await prisma.exercise.findUnique({
+    where: { id: exerciseId },
+    select: { primaryMuscles: true, secondaryMuscles: true },
+  })
+
+  const primary = exercise ? parseMuscles(exercise.primaryMuscles) : []
+  const secondary = exercise ? parseMuscles(exercise.secondaryMuscles) : []
+  const muscleVolumes = calcMuscleVolumes(primary, secondary, weight, reps, isWarmup)
+
+  // Get userId from the training log first
+  const trainingLog = await prisma.trainingLog.findUnique({
+    where: { id: logId },
+    select: { userId: true },
+  })
+  const userId = trainingLog?.userId || ''
+
   const entry = await prisma.logEntry.create({
     data: {
       logId,
-      userId: '', // will be set from trainingLog
+      userId,
       exerciseId,
       exerciseName,
       setNumber,
@@ -57,27 +112,16 @@ export async function addLogEntry(
       reps,
       isWarmup,
       e1rm,
+      muscleVolumes: muscleVolumes as unknown as Prisma.InputJsonValue,
     },
   })
 
-  // Update userId from the training log
-  const trainingLog = await prisma.trainingLog.findUnique({
-    where: { id: logId },
-    select: { userId: true },
-  })
-
-  if (trainingLog) {
-    await prisma.logEntry.update({
-      where: { id: entry.id },
-      data: { userId: trainingLog.userId },
-    })
-  }
-
-  return { ...entry, userId: trainingLog?.userId || '' }
+  return { ...entry, userId }
 }
 
 /**
  * Complete a training session - calculates totalVolume and duration
+ * totalVolume = sum of all muscleVolumes values (primary + weighted secondary)
  */
 export async function completeTraining(
   logId: string
@@ -87,10 +131,17 @@ export async function completeTraining(
     where: { logId, isWarmup: false },
   })
 
-  // Calculate total volume (sum of weight * reps for non-warmup sets)
-  const totalVolume = entries.reduce((sum, entry) => {
-    return sum + entry.weight * entry.reps
-  }, 0)
+  // Calculate total volume: sum of all muscleVolumes values
+  // (primary × 1.0 + secondary × 0.5 already baked in)
+  let totalVolume = 0
+  for (const entry of entries) {
+    const volumes = entry.muscleVolumes as Record<string, number> | null
+    if (volumes) {
+      for (const v of Object.values(volumes)) {
+        totalVolume += v
+      }
+    }
+  }
 
   // Get the training log to calculate duration
   const log = await prisma.trainingLog.findUnique({
