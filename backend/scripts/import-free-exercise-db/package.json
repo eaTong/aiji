@@ -1,0 +1,24 @@
+{
+  "name": "import-free-exercise-db",
+  "version": "1.0.0",
+  "description": "Import free-exercise-db data into AI己 project",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "copy": "tsx src/downloader.ts",
+    "transform": "tsx src/transformer.ts",
+    "enrich": "tsx src/aiEnricher.ts",
+    "upload": "tsx src/uploader.ts",
+    "import": "tsx src/importer.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.10.0",
+    "ali-oss": "^6.20.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "prisma": "^5.10.0",
+    "tsx": "^4.6.0",
+    "typescript": "^5.3.0"
+  }
+}
