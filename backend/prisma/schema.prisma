@@ -28,6 +28,7 @@ model User {
   exercises          Exercise[]
   recoveryStatuses   RecoveryStatus[]
   logEntries         LogEntry[]
+  trainingLogs      TrainingLog[]
   workoutPlans       WorkoutPlan[]
 }
 
@@ -120,22 +121,44 @@ model RecoveryStatus {
   @@unique([userId, date])
 }
 
-model LogEntry {
-  id            String   @id @default(uuid())
+model TrainingLog {
+  id            String    @id @default(uuid())
   userId        String
-  exerciseId    String
-  sets          Int
-  reps          Int
-  weight        Float?
-  duration      Int?     // seconds for cardio
-  distance      Float?    // km for cardio
-  rpe           Int?      // rating of perceived exertion 1-10
-  notes         String?
-  loggedAt      DateTime @db.Date
-  createdAt     DateTime @default(now())
+  planId        String?
+  planDayId     String?
+  startedAt     DateTime  @default(now())
+  completedAt   DateTime?
+  duration      Int?      // seconds
+  totalVolume   Float?    // kg, sum of weight * reps for non-warmup sets
+  status        LogStatus @default(IN_PROGRESS)
 
   user      User      @relation(fields: [userId], references: [id])
-  exercise  Exercise  @relation(fields: [exerciseId], references: [id])
+  logEntries LogEntry[]
+}
+
+enum LogStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+model LogEntry {
+  id            String    @id @default(uuid())
+  userId        String
+  logId         String
+  exerciseId    String
+  exerciseName  String
+  setNumber     Int
+  weight        Float
+  reps          Int
+  isWarmup      Boolean   @default(false)
+  e1rm          Float?    // estimated 1RM (Epley formula)
+  completedAt   DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+
+  user       User        @relation(fields: [userId], references: [id])
+  trainingLog TrainingLog @relation(fields: [logId], references: [id])
+  exercise   Exercise    @relation(fields: [exerciseId], references: [id])
 }
 
 model PlannedExercise {
@@ -170,8 +193,8 @@ model Exercise {
   nameEn        String?
   category      ExerciseCategory
   equipment     Equipment
-  primaryMuscles String[]
-  secondaryMuscles String[]
+  primaryMuscles Json
+  secondaryMuscles Json
   instructions  String?
   commonMistakes String?
   videoUrl      String?

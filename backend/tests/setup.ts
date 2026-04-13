@@ -21,6 +21,7 @@ afterEach(async () => {
   await prisma.plannedExercise.deleteMany()
   await prisma.workoutPlan.deleteMany()
   await prisma.logEntry.deleteMany()
+  await prisma.trainingLog.deleteMany()
   await prisma.exercise.deleteMany()
   await prisma.recoveryStatus.deleteMany()
   await prisma.progressPhoto.deleteMany()
