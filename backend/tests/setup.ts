@@ -19,6 +19,7 @@ afterAll(async () => {
 
 afterEach(async () => {
   await prisma.plannedExercise.deleteMany()
+  await prisma.planDay.deleteMany()
   await prisma.workoutPlan.deleteMany()
   await prisma.logEntry.deleteMany()
   await prisma.trainingLog.deleteMany()
