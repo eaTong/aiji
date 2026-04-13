@@ -17,7 +17,7 @@
         <text class="group-label">主要肌群</text>
         <view class="tag-list">
           <text
-            v-for="muscle in exercise.primaryMuscles"
+            v-for="muscle in translatedPrimaryMuscles"
             :key="muscle"
             class="tag primary-tag"
           >{{ muscle }}</text>
@@ -27,7 +27,7 @@
         <text class="group-label">次要肌群</text>
         <view class="tag-list">
           <text
-            v-for="muscle in exercise.secondaryMuscles"
+            v-for="muscle in translatedSecondaryMuscles"
             :key="muscle"
             class="tag secondary-tag"
           >{{ muscle }}</text>
@@ -36,9 +36,15 @@
     </view>
 
     <!-- Instructions -->
-    <view v-if="exercise.instructions" class="section">
+    <view v-if="displayInstructions" class="section">
       <text class="section-title">动作说明</text>
-      <text class="instructions-text">{{ exercise.instructions }}</text>
+      <text class="instructions-text">{{ displayInstructions }}</text>
+    </view>
+
+    <!-- Warnings -->
+    <view v-if="exercise.warnings" class="section warning-section">
+      <text class="section-title">注意事项</text>
+      <text class="warning-text">{{ exercise.warnings }}</text>
     </view>
 
     <!-- Common Mistakes -->
@@ -83,9 +89,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { getExerciseById, toggleFavorite, type Exercise } from '../../api/exercise'
 import { getExerciseHistory } from '../../api/trainingLog'
+import { translateMuscles } from '../../utils/muscleMap'
 
 const catLabels: Record<string, string> = {
   CHEST: '胸部',
@@ -98,10 +105,8 @@ const catLabels: Record<string, string> = {
 }
 
 const equipLabels: Record<string, string> = {
-  BARBELL: '杠铃',
+  GYM: '健身房',
   DUMBBELL: '哑铃',
-  CABLE: '绳索',
-  MACHINE: '器械',
   BODYWEIGHT: '自重',
 }
 
@@ -115,6 +120,24 @@ interface HistoryRecord {
 const exercise = ref<Exercise | null>(null)
 const history = ref<HistoryRecord[]>([])
 const exerciseId = ref('')
+
+// 计算属性：翻译后的肌肉名称
+const translatedPrimaryMuscles = computed(() => {
+  if (!exercise.value?.primaryMuscles) return []
+  return translateMuscles(exercise.value.primaryMuscles)
+})
+
+const translatedSecondaryMuscles = computed(() => {
+  if (!exercise.value?.secondaryMuscles) return []
+  return translateMuscles(exercise.value.secondaryMuscles)
+})
+
+// 计算属性：优先显示中文说明
+const displayInstructions = computed(() => {
+  if (!exercise.value) return ''
+  // 优先使用中文说明，其次使用英文说明
+  return exercise.value.instructionsZh || exercise.value.instructions || ''
+})
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr)
@@ -252,6 +275,16 @@ onMounted(async () => {
 .instructions-text {
   font-size: 28rpx;
   color: #333;
+  line-height: 1.8;
+}
+
+.warning-section {
+  background: #fff3e0;
+}
+
+.warning-text {
+  font-size: 28rpx;
+  color: #e65100;
   line-height: 1.8;
 }
 

@@ -1,13 +1,13 @@
 import { readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
-import { FreeExerciseDbItem, ProcessedExercise } from './types'
+import { FreeExerciseDbItem, ProcessedExercise, MuscleItem } from './types'
 import {
   EQUIPMENT_MAPPING,
   CATEGORY_MAPPING,
   inferCategory,
-  translateMuscles,
 } from './mapping'
+import { getMuscleMapping } from './muscleMapping'
 
 const CWD = process.cwd()
 const DATA_DIR = join(CWD, 'data')
@@ -23,13 +23,32 @@ async function loadRawData(): Promise<FreeExerciseDbItem[]> {
 }
 
 /**
+ * 转换单个 free-exercise-db 肌肉名称到 Muscle.code 数组
+ */
+function mapMuscle(muscleName: string, role: 'PRIMARY' | 'SECONDARY'): MuscleItem[] {
+  const mapping = getMuscleMapping(muscleName, role)
+  if (!mapping) {
+    return []
+  }
+  return mapping.map(m => ({
+    code: m.code,
+    ratio: m.ratio,
+  }))
+}
+
+/**
  * 转换单个动作
  */
-function transformExercise(item: FreeExerciseDbItem): ProcessedExercise {
+function transformExercise(item: FreeExerciseDbItem): ProcessedExercise | null {
+  // 过滤无效分类
+  const validCategories = ['strength', 'cardio', 'stretching', 'olympic', 'powerlifting', 'strongman']
+  if (!validCategories.includes(item.category.toLowerCase())) {
+    return null
+  }
+
   // 确定分类
   let category = CATEGORY_MAPPING[item.category.toLowerCase()]
   if (!category) {
-    // 尝试通过主肌群推断
     category = inferCategory(item.primaryMuscles)
   }
 
@@ -41,6 +60,18 @@ function transformExercise(item: FreeExerciseDbItem): ProcessedExercise {
     equipment = 'GYM'
   }
 
+  // 转换主肌群
+  const primaryMuscles: MuscleItem[] = []
+  for (const muscle of item.primaryMuscles || []) {
+    primaryMuscles.push(...mapMuscle(muscle, 'PRIMARY'))
+  }
+
+  // 转换辅肌群
+  const secondaryMuscles: MuscleItem[] = []
+  for (const muscle of item.secondaryMuscles || []) {
+    secondaryMuscles.push(...mapMuscle(muscle, 'SECONDARY'))
+  }
+
   // 合并 instructions 数组为字符串
   const instructions = item.instructions?.join('\n') || ''
 
@@ -50,8 +81,8 @@ function transformExercise(item: FreeExerciseDbItem): ProcessedExercise {
     nameEn: item.name,
     category,
     equipment,
-    primaryMuscles: translateMuscles(item.primaryMuscles),
-    secondaryMuscles: translateMuscles(item.secondaryMuscles || []),
+    primaryMuscles,
+    secondaryMuscles,
     instructions,
     level: item.level,
     images: item.images || [],
@@ -67,7 +98,31 @@ async function transform(): Promise<ProcessedExercise[]> {
   console.log(`共 ${rawData.length} 个动作`)
 
   console.log('转换数据...')
-  const transformed = rawData.map(transformExercise)
+  const transformed: ProcessedExercise[] = []
+  let skipped = 0
+
+  for (const item of rawData) {
+    const processed = transformExercise(item)
+    if (processed) {
+      transformed.push(processed)
+    } else {
+      skipped++
+    }
+  }
+
+  console.log(`转换完成: ${transformed.length} 个动作, ${skipped} 个跳过（无效分类）`)
+
+  // 检查未映射的肌肉
+  const allMuscles = new Set<string>()
+  for (const ex of transformed) {
+    for (const m of ex.primaryMuscles) {
+      allMuscles.add(m.code)
+    }
+    for (const m of ex.secondaryMuscles) {
+      allMuscles.add(m.code)
+    }
+  }
+  console.log(`涉及 ${allMuscles.size} 个肌肉部位`)
 
   // 确保输出目录存在
   await writeFile(

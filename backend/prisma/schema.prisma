@@ -224,17 +224,20 @@ model Exercise {
   equipment     Equipment
   primaryMuscles Json
   secondaryMuscles Json
-  instructions  String?
-  commonMistakes String?
+  instructions  String?  @db.VarChar(2000)
+  instructionsZh String?  @db.Text
+  commonMistakes String?  @db.Text
+  warnings      String?  @db.Text
   videoUrl      String?
   isCustom      Boolean  @default(false)
   isFavorite    Boolean  @default(false)
   userId        String?
   createdAt     DateTime  @default(now())
 
-  user          User?     @relation(fields: [userId], references: [id])
-  logEntries    LogEntry[]
+  user             User?           @relation(fields: [userId], references: [id])
+  logEntries       LogEntry[]
   plannedExercises PlannedExercise[]
+  exerciseMuscles  ExerciseMuscle[]
 }
 
 enum ExerciseCategory {
@@ -245,4 +248,47 @@ enum ExerciseCategory {
   ARMS
   CORE
   CARDIO
+}
+
+enum MuscleCategory {
+  CHEST
+  BACK
+  LEGS
+  SHOULDERS
+  ARMS
+  CORE
+}
+
+enum MuscleRole {
+  PRIMARY
+  SECONDARY
+}
+
+model Muscle {
+  id            String        @id @default(uuid())
+  code          String        @unique
+  name          String
+  aliases       Json
+  category      MuscleCategory
+  parentCode    String?
+  recoveryHours Int           @default(48)
+  createdAt     DateTime      @default(now())
+
+  parent            Muscle?          @relation("MuscleHierarchy", fields: [parentCode], references: [code])
+  children          Muscle[]         @relation("MuscleHierarchy")
+  exerciseMuscles   ExerciseMuscle[]
+}
+
+model ExerciseMuscle {
+  id          String     @id @default(uuid())
+  exerciseId  String
+  muscleId    String
+  role        MuscleRole
+  ratio       Float      @default(1.0)
+  createdAt   DateTime   @default(now())
+
+  exercise Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  muscle   Muscle   @relation(fields: [muscleId], references: [id])
+
+  @@unique([exerciseId, muscleId])
 }

@@ -1,0 +1,279 @@
+[
+  {
+    "code": "CHEST",
+    "name": "胸部",
+    "aliases": ["chest", "pectorals", "pecs"],
+    "category": "CHEST",
+    "parentCode": null,
+    "recoveryHours": 72
+  },
+  {
+    "code": "CHEST_UPPER",
+    "name": "上胸",
+    "aliases": ["upper chest", "upper pecs", "upper pectorals", "clavicular"],
+    "category": "CHEST",
+    "parentCode": "CHEST",
+    "recoveryHours": 72
+  },
+  {
+    "code": "CHEST_MIDDLE",
+    "name": "中胸",
+    "aliases": ["middle chest", "mid pecs", "mid pectorals"],
+    "category": "CHEST",
+    "parentCode": "CHEST",
+    "recoveryHours": 72
+  },
+  {
+    "code": "CHEST_LOWER",
+    "name": "下胸",
+    "aliases": ["lower chest", "lower pecs", "lower pectorals", "sternal"],
+    "category": "CHEST",
+    "parentCode": "CHEST",
+    "recoveryHours": 72
+  },
+
+  {
+    "code": "BACK",
+    "name": "背部",
+    "aliases": ["back", "upper back"],
+    "category": "BACK",
+    "parentCode": null,
+    "recoveryHours": 72
+  },
+  {
+    "code": "LATS",
+    "name": "背阔肌",
+    "aliases": ["lats", "latissimus", "lat"],
+    "category": "BACK",
+    "parentCode": "BACK",
+    "recoveryHours": 72
+  },
+  {
+    "code": "TRAPS",
+    "name": "斜方肌",
+    "aliases": ["traps", "trapezius"],
+    "category": "BACK",
+    "parentCode": "BACK",
+    "recoveryHours": 48
+  },
+  {
+    "code": "TRAPS_UPPER",
+    "name": "斜方肌上束",
+    "aliases": ["upper traps", "upper trapezius"],
+    "category": "BACK",
+    "parentCode": "TRAPS",
+    "recoveryHours": 48
+  },
+  {
+    "code": "TRAPS_MIDDLE",
+    "name": "斜方肌中束",
+    "aliases": ["middle traps", "middle trapezius"],
+    "category": "BACK",
+    "parentCode": "TRAPS",
+    "recoveryHours": 48
+  },
+  {
+    "code": "TRAPS_LOWER",
+    "name": "斜方肌下束",
+    "aliases": ["lower traps", "lower trapezius"],
+    "category": "BACK",
+    "parentCode": "TRAPS",
+    "recoveryHours": 48
+  },
+  {
+    "code": "RHOMBOID",
+    "name": "菱形肌",
+    "aliases": ["rhomboid", "rhomboids", "middle back"],
+    "category": "BACK",
+    "parentCode": "BACK",
+    "recoveryHours": 48
+  },
+  {
+    "code": "LOWER_BACK",
+    "name": "下背",
+    "aliases": ["lower back", "erector", "spinae", "lumbar"],
+    "category": "BACK",
+    "parentCode": "BACK",
+    "recoveryHours": 72
+  },
+
+  {
+    "code": "LEGS",
+    "name": "腿部",
+    "aliases": ["legs", "lower body"],
+    "category": "LEGS",
+    "parentCode": null,
+    "recoveryHours": 72
+  },
+  {
+    "code": "QUADS",
+    "name": "股四头肌",
+    "aliases": ["quads", "quadriceps", "vastus"],
+    "category": "LEGS",
+    "parentCode": "LEGS",
+    "recoveryHours": 72
+  },
+  {
+    "code": "HAMSTRINGS",
+    "name": "腘绳肌",
+    "aliases": ["hamstrings", "hamstring", "biceps femoris"],
+    "category": "LEGS",
+    "parentCode": "LEGS",
+    "recoveryHours": 72
+  },
+  {
+    "code": "GLUTES",
+    "name": "臀肌",
+    "aliases": ["glutes", "gluteus", "buttocks", "gluteus maximus"],
+    "category": "LEGS",
+    "parentCode": "LEGS",
+    "recoveryHours": 72
+  },
+  {
+    "code": "ADDUCTORS",
+    "name": "内收肌",
+    "aliases": ["adductors", "adductor", "groin"],
+    "category": "LEGS",
+    "parentCode": "LEGS",
+    "recoveryHours": 48
+  },
+  {
+    "code": "ABDUCTORS",
+    "name": "外展肌",
+    "aliases": ["abductors", "abductor"],
+    "category": "LEGS",
+    "parentCode": "LEGS",
+    "recoveryHours": 48
+  },
+  {
+    "code": "CALVES",
+    "name": "小腿",
+    "aliases": ["calves", "calf", "gastrocnemius", "soleus"],
+    "category": "LEGS",
+    "parentCode": "LEGS",
+    "recoveryHours": 24
+  },
+
+  {
+    "code": "SHOULDERS",
+    "name": "肩部",
+    "aliases": ["shoulders", "delts", "deltoids"],
+    "category": "SHOULDERS",
+    "parentCode": null,
+    "recoveryHours": 48
+  },
+  {
+    "code": "DELTS_FRONT",
+    "name": "三角肌前束",
+    "aliases": ["front delts", "anterior deltoid", "front deltoid"],
+    "category": "SHOULDERS",
+    "parentCode": "SHOULDERS",
+    "recoveryHours": 48
+  },
+  {
+    "code": "DELTS_MIDDLE",
+    "name": "三角肌中束",
+    "aliases": ["side delts", "lateral deltoid", "middle deltoid", "medial delt"],
+    "category": "SHOULDERS",
+    "parentCode": "SHOULDERS",
+    "recoveryHours": 48
+  },
+  {
+    "code": "DELTS_REAR",
+    "name": "三角肌后束",
+    "aliases": ["rear delts", "posterior deltoid", "back deltoid"],
+    "category": "SHOULDERS",
+    "parentCode": "SHOULDERS",
+    "recoveryHours": 48
+  },
+
+  {
+    "code": "ARMS",
+    "name": "手臂",
+    "aliases": ["arms", "upper arms"],
+    "category": "ARMS",
+    "parentCode": null,
+    "recoveryHours": 48
+  },
+  {
+    "code": "BICEPS",
+    "name": "肱二头肌",
+    "aliases": ["biceps", "bicep", "biceps brachii"],
+    "category": "ARMS",
+    "parentCode": "ARMS",
+    "recoveryHours": 48
+  },
+  {
+    "code": "TRICEPS",
+    "name": "肱三头肌",
+    "aliases": ["triceps", "tricep", "triceps brachii"],
+    "category": "ARMS",
+    "parentCode": "ARMS",
+    "recoveryHours": 48
+  },
+  {
+    "code": "BRACHIALIS",
+    "name": "肱肌",
+    "aliases": ["brachialis"],
+    "category": "ARMS",
+    "parentCode": "ARMS",
+    "recoveryHours": 24
+  },
+  {
+    "code": "FOREARMS",
+    "name": "前臂",
+    "aliases": ["forearms", "forearm", "wrist flexors", "wrist extensors"],
+    "category": "ARMS",
+    "parentCode": "ARMS",
+    "recoveryHours": 24
+  },
+
+  {
+    "code": "CORE",
+    "name": "核心",
+    "aliases": ["core", "abs", "abdominals", "trunk"],
+    "category": "CORE",
+    "parentCode": null,
+    "recoveryHours": 48
+  },
+  {
+    "code": "ABS",
+    "name": "腹肌",
+    "aliases": ["abs", "abdominals", "abdominal"],
+    "category": "CORE",
+    "parentCode": "CORE",
+    "recoveryHours": 48
+  },
+  {
+    "code": "ABS_UPPER",
+    "name": "上腹",
+    "aliases": ["upper abs", "upper abdominal"],
+    "category": "CORE",
+    "parentCode": "ABS",
+    "recoveryHours": 48
+  },
+  {
+    "code": "ABS_LOWER",
+    "name": "下腹",
+    "aliases": ["lower abs", "lower abdominal"],
+    "category": "CORE",
+    "parentCode": "ABS",
+    "recoveryHours": 48
+  },
+  {
+    "code": "OBLIQUES",
+    "name": "腹斜肌",
+    "aliases": ["obliques", "oblique", "side abs", "waist"],
+    "category": "CORE",
+    "parentCode": "CORE",
+    "recoveryHours": 48
+  },
+  {
+    "code": "TRANSVERSE",
+    "name": "腹横肌",
+    "aliases": ["transverse", "tvA", "transverse abdominis"],
+    "category": "CORE",
+    "parentCode": "CORE",
+    "recoveryHours": 48
+  }
+]

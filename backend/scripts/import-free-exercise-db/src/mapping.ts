@@ -1,4 +1,8 @@
-import { ExerciseCategory, Equipment } from '../../src/models/exerciseService'
+// ExerciseCategory 枚举
+type ExerciseCategory = 'CHEST' | 'BACK' | 'LEGS' | 'SHOULDERS' | 'ARMS' | 'CORE' | 'CARDIO'
+
+// Equipment 枚举
+type Equipment = 'GYM' | 'DUMBBELL' | 'BODYWEIGHT'
 
 /**
  * 肌肉名称中英文映射表

@@ -1,31 +1,29 @@
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
-import { PrismaClient } from '@prisma/client'
+// @ts-ignore - 使用 backend 的 prisma client
+import { PrismaClient } from '../backend_node_modules/@prisma/client'
+import { FinalExercise } from './types'
 
 const CWD = process.cwd()
 const OUTPUT_DIR = join(CWD, 'output')
 
 const prisma = new PrismaClient()
 
-interface FinalExercise {
-  name: string
-  nameEn: string
-  category: string
-  equipment: string
-  primaryMuscles: string[]
-  secondaryMuscles: string[]
-  instructions: string | null
-  commonMistakes: string | null
-  videoUrl: string | null
-  isCustom: boolean
-  isFavorite: boolean
-  userId: string | null
-}
-
 interface ProcessedData {
   generatedAt: string
   exercises: FinalExercise[]
+}
+
+/**
+ * 根据 Muscle.code 查找 Muscle.id
+ */
+async function getMuscleIdByCode(code: string): Promise<string | null> {
+  const muscle = await prisma.muscle.findUnique({
+    where: { code },
+    select: { id: true },
+  })
+  return muscle?.id || null
 }
 
 /**
@@ -52,49 +50,94 @@ async function importToDatabase(): Promise<void> {
   if (existingCount > 0) {
     console.warn(`警告: 数据库中已有 ${existingCount} 个系统动作`)
     console.warn('为避免重复，导入前将清空现有系统动作')
-    console.warn('按 Ctrl+C 取消，或继续...')
-    // 自动继续，不等待输入
   }
 
-  // 清空现有系统动作（可选）
-  // await prisma.exercise.deleteMany({
-  //   where: { isCustom: false, userId: null }
-  // })
+  // 清空现有系统动作的中间表和动作
+  console.log('清空现有系统动作...')
+  await prisma.exerciseMuscle.deleteMany({
+    where: {
+      exercise: {
+        isCustom: false,
+        userId: null,
+      },
+    },
+  })
+  await prisma.exercise.deleteMany({
+    where: { isCustom: false, userId: null },
+  })
 
   // 批量导入
-  const BATCH_SIZE = 50
   let imported = 0
   let skipped = 0
+  let musclesNotFound = 0
 
   console.log('开始导入数据库...')
 
-  for (let i = 0; i < data.exercises.length; i += BATCH_SIZE) {
-    const batch = data.exercises.slice(i, i + BATCH_SIZE)
+  for (let i = 0; i < data.exercises.length; i++) {
+    const ex = data.exercises[i]
 
     try {
-      await prisma.exercise.createMany({
-        data: batch.map(ex => ({
+      // 收集所有肌肉关联（去重）
+      const allMuscles: Array<{ muscleCode: string; ratio: number; role: 'PRIMARY' | 'SECONDARY' }> = []
+
+      for (const muscle of ex.primaryMuscles) {
+        allMuscles.push({ muscleCode: muscle.code, ratio: muscle.ratio, role: 'PRIMARY' })
+      }
+      for (const muscle of ex.secondaryMuscles) {
+        allMuscles.push({ muscleCode: muscle.code, ratio: muscle.ratio * 0.5, role: 'SECONDARY' })
+      }
+
+      // 去重：同一肌肉只保留一个（主肌群优先）
+      const uniqueMuscles = new Map<string, { ratio: number; role: 'PRIMARY' | 'SECONDARY' }>()
+      for (const m of allMuscles) {
+        const existing = uniqueMuscles.get(m.muscleCode)
+        if (!existing || existing.role === 'SECONDARY') {
+          uniqueMuscles.set(m.muscleCode, { ratio: m.ratio, role: m.role })
+        }
+      }
+
+      // 1. 创建 Exercise
+      const exercise = await prisma.exercise.create({
+        data: {
           name: ex.name,
           nameEn: ex.nameEn,
-          category: ex.category as any,
-          equipment: ex.equipment as any,
-          primaryMuscles: ex.primaryMuscles,
-          secondaryMuscles: ex.secondaryMuscles,
+          category: ex.category,
+          equipment: ex.equipment,
+          primaryMuscles: ex.primaryMuscles.map(m => m.code),
+          secondaryMuscles: ex.secondaryMuscles.map(m => m.code),
           instructions: ex.instructions,
+          instructionsZh: ex.instructionsZh,
           commonMistakes: ex.commonMistakes,
+          warnings: ex.warnings,
           videoUrl: ex.videoUrl,
           isCustom: ex.isCustom,
           isFavorite: ex.isFavorite,
           userId: ex.userId,
-        })),
-        skipDuplicates: true,  // 跳过已存在的
+        },
       })
 
-      imported += batch.length
+      // 2. 创建肌肉关联
+      for (const [muscleCode, { ratio, role }] of uniqueMuscles) {
+        const muscleId = await getMuscleIdByCode(muscleCode)
+        if (muscleId) {
+          await prisma.exerciseMuscle.create({
+            data: {
+              exerciseId: exercise.id,
+              muscleId,
+              role,
+              ratio,
+            },
+          })
+        } else {
+          musclesNotFound++
+        }
+      }
+
+      imported++
       process.stdout.write(`\r进度: ${imported}/${data.exercises.length}`)
     } catch (error) {
-      console.error(`\n批量 ${i / BATCH_SIZE + 1} 导入失败:`, error)
-      skipped += batch.length
+      console.error(`\n动作 ${ex.name} 导入失败:`, error)
+      skipped++
     }
   }
 
@@ -102,6 +145,9 @@ async function importToDatabase(): Promise<void> {
   console.log(`  成功: ${imported - skipped}`)
   console.log(`  跳过: ${skipped}`)
   console.log(`  总计: ${data.exercises.length}`)
+  if (musclesNotFound > 0) {
+    console.log(`  警告: ${musclesNotFound} 个肌肉未找到`)
+  }
 }
 
 // 如果直接运行此脚本

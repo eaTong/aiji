@@ -5,11 +5,13 @@ export interface Exercise {
   name: string
   nameEn?: string
   category: 'CHEST' | 'BACK' | 'LEGS' | 'SHOULDERS' | 'ARMS' | 'CORE' | 'CARDIO'
-  equipment: 'BARBELL' | 'DUMBBELL' | 'CABLE' | 'MACHINE' | 'BODYWEIGHT'
-  primaryMuscles: string[]
-  secondaryMuscles: string[]
-  instructions?: string
+  equipment: 'GYM' | 'DUMBBELL' | 'BODYWEIGHT'
+  primaryMuscles: string[]  // muscle codes
+  secondaryMuscles: string[]  // muscle codes
+  instructions?: string  // 英文说明
+  instructionsZh?: string  // 中文说明（优先显示）
   commonMistakes?: string
+  warnings?: string  // 注意事项
   isFavorite: boolean
 }
 

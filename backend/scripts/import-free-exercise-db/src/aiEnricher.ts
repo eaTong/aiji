@@ -1,137 +1,113 @@
 import { readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
-import { ProcessedExercise, EnrichedExercise, WebSearchResult } from './types'
+import { ProcessedExercise, EnrichedExercise } from './types'
 
 const CWD = process.cwd()
 const OUTPUT_DIR = join(CWD, 'output')
-const CONCURRENCY = 5
+const BATCH_SIZE = 2  // 每批处理2个动作
+const CONCURRENCY = 2  // 并发数
+
+// MiniMax API 配置
+const MINIMAX_API_KEY = 'sk-cp-g2f8gf-BF_bd4WkOVvvI8OsEGfYrojAwJ9esutVeRHK-fBDHWj9DDvocvT3lAo5J-RORvlQ7cVi2qLz8XT_9j-TyefbS6HCh4HEUgDc0HDlMzcWdqAZDxcI'
+const MINIMAX_API_URL = 'https://api.minimaxi.com/v1/chat/completions'
 
 /**
- * 搜索动作的注意事项和易错点
+ * AI增强单批动作（10个）
  */
-async function searchExerciseInfo(
-  exercise: ProcessedExercise
-): Promise<{ warnings: string[]; mistakes: string[] }> {
-  const query = `${exercise.nameEn} exercise form tips mistakes warnings`
+async function enrichBatch(
+  exercises: ProcessedExercise[]
+): Promise<Array<{ name: string; instructionsZh: string; warnings: string[]; mistakes: string[] }>> {
+  // 构建 prompt
+  const exercisesText = exercises.map((ex, i) => {
+    const muscles = [
+      ...ex.primaryMuscles.map(m => `${m.code}(权重${m.ratio})`),
+      ...ex.secondaryMuscles.map(m => `${m.code}(辅权重${m.ratio})`),
+    ].join(', ')
+
+    return `${i + 1}. ${ex.nameEn}
+   肌肉: ${muscles}
+   步骤: ${ex.instructions.substring(0, 200)}...`
+  }).join('\n\n')
+
+  const prompt = `请将以下健身动作翻译成中文并返回完整JSON（不要任何其他内容）：
+
+${exercisesText}
+
+请直接返回JSON数组（不要任何其他内容）：
+[{"name":"中文名称1","instructionsZh":"中文步骤说明","warnings":["注意事项1","注意事项2"],"mistakes":["易错点1","易错点2"]},...]`
 
   try {
-    const results = await webSearch(query)
-
-    // 提取注意事项
-    const warnings = extractWarnings(results)
-    // 提取易错点
-    const mistakes = extractMistakes(results)
-
-    return { warnings, mistakes }
-  } catch (error) {
-    console.warn(`搜索失败 ${exercise.nameEn}:`, error)
-    return { warnings: [], mistakes: [] }
-  }
-}
-
-/**
- * WebSearch 封装
- */
-async function webSearch(query: string): Promise<WebSearchResult[]> {
-  // 使用 DuckDuckGo HTML 版本
-  const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`
-
-  try {
-    const response = await fetch(url, {
+    const response = await fetch(MINIMAX_API_URL, {
+      method: 'POST',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${MINIMAX_API_KEY}`,
       },
+      body: JSON.stringify({
+        model: 'MiniMax-M2.7',
+        max_tokens: 4096,
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+      }),
     })
 
-    const html = await response.text()
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.warn(`MiniMax API 失败: ${response.status} - ${errorText}`)
+      // 返回空结果
+      return exercises.map(() => ({ name: '', instructionsZh: '', warnings: [], mistakes: [] }))
+    }
 
-    // 解析搜索结果
-    const results: WebSearchResult[] = []
-    const resultRegex = /<a class="result__a" href="([^"]+)">([^<]+)<\/a>[\s\S]*?<a class="result__snippet"[^>]*>([\s\S]*?)</g
+    const data = await response.json() as { choices?: Array<{ message?: { content?: string } }>; reply?: string }
+    const content = data.choices?.[0]?.message?.content || data.reply || ''
 
-    let match
-    while ((match = resultRegex.exec(html)) !== null && results.length < 10) {
-      const link = match[1]
-      const title = match[2].replace(/<[^>]+>/g, '').trim()
-      const snippet = match[3].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+    // 提取 JSON（移除思考标签）
+    const thinkCloseIndex = content.indexOf('</think>')
+    let jsonStr = content
 
-      if (title && link && snippet) {
-        results.push({ title, url: link, snippet })
+    if (thinkCloseIndex !== -1) {
+      jsonStr = content.substring(thinkCloseIndex + 8).trim()  // 8 = strlen('</think>')
+    }
+
+    // 移除 markdown 代码块
+    jsonStr = jsonStr.replace(/```json\n?/, '').replace(/```\n?$/, '').trim()
+
+    // 尝试找到完整的 JSON 数组
+    const arrayStart = jsonStr.indexOf('[')
+    const arrayEnd = jsonStr.lastIndexOf(']')
+
+    if (arrayStart !== -1 && arrayEnd !== -1 && arrayEnd > arrayStart) {
+      const trimmedJson = jsonStr.substring(arrayStart, arrayEnd + 1)
+      try {
+        const results = JSON.parse(trimmedJson)
+        if (Array.isArray(results)) {
+          return results.slice(0, exercises.length).map((r: any) => ({
+            name: r.name || '',
+            instructionsZh: r.instructionsZh || '',
+            warnings: Array.isArray(r.warnings) ? r.warnings : [],
+            mistakes: Array.isArray(r.mistakes) ? r.mistakes : [],
+          }))
+        }
+      } catch (e) {
+        console.warn(`JSON解析失败: ${e instanceof Error ? e.message : String(e)}`)
       }
     }
 
-    return results
+    // 解析失败，返回空结果
+    return exercises.map(() => ({ name: '', instructionsZh: '', warnings: [], mistakes: [] }))
   } catch (error) {
-    console.warn(`搜索请求失败: ${query}`, error)
-    return []
+    console.warn(`MiniMax API 错误:`, error)
+    return exercises.map(() => ({ name: '', instructionsZh: '', warnings: [], mistakes: [] }))
   }
 }
 
 /**
- * 从搜索结果中提取注意事项
- */
-function extractWarnings(results: WebSearchResult[]): string[] {
-  const warnings: string[] = []
-
-  const patterns = [
-    /warning[s]?:?\s*([^.]+)/gi,
-    /tip[s]?:?\s*([^.]+)/gi,
-    /safety[s]?:?\s*([^.]+)/gi,
-    /注意[s]?:?\s*([^。]+)/g,
-    /安全[s]?:?\s*([^。]+)/g,
-  ]
-
-  for (const result of results) {
-    const content = result.snippet
-    for (const pattern of patterns) {
-      const matches = content.matchAll(new RegExp(pattern.source, pattern.flags))
-      for (const match of matches) {
-        const text = match[1].trim()
-        if (text.length > 10 && text.length < 200) {
-          warnings.push(text)
-        }
-      }
-    }
-  }
-
-  return [...new Set(warnings)].slice(0, 5)
-}
-
-/**
- * 从搜索结果中提取易错点
- */
-function extractMistakes(results: WebSearchResult[]): string[] {
-  const mistakes: string[] = []
-
-  const patterns = [
-    /common\s+mistake[s]?:?\s*([^.]+)/gi,
-    /error[s]?:?\s*([^.]+)/gi,
-    /avoid\s+([^.]+)/gi,
-    /don'?t\s+([^.]+)/gi,
-    /易错[s]?:?\s*([^。]+)/g,
-    /错误[s]?:?\s*([^。]+)/g,
-    /不要[s]?:?\s*([^。]+)/g,
-  ]
-
-  for (const result of results) {
-    const content = result.snippet
-    for (const pattern of patterns) {
-      const matches = content.matchAll(new RegExp(pattern.source, pattern.flags))
-      for (const match of matches) {
-        const text = match[1].trim()
-        if (text.length > 10 && text.length < 200) {
-          mistakes.push(text)
-        }
-      }
-    }
-  }
-
-  return [...new Set(mistakes)].slice(0, 5)
-}
-
-/**
- * 生成中文动作说明
+ * 生成中文动作说明（备用，当AI失败时）
  */
 function generateChineseInstructions(exercise: ProcessedExercise): string {
   const lines = exercise.instructions.split('\n').filter(Boolean)
@@ -145,23 +121,14 @@ function generateChineseInstructions(exercise: ProcessedExercise): string {
 async function enrichExercise(
   exercise: ProcessedExercise
 ): Promise<EnrichedExercise> {
-  // 搜索网络信息
-  const searchResult = await searchExerciseInfo(exercise)
+  const [result] = await enrichBatch([exercise])
 
   return {
-    sourceId: exercise.sourceId,
-    name: exercise.nameEn,  // 暂用英文名，AI翻译后替换
-    nameEn: exercise.nameEn,
-    category: exercise.category,
-    equipment: exercise.equipment,
-    primaryMuscles: exercise.primaryMuscles,
-    secondaryMuscles: exercise.secondaryMuscles,
-    instructions: exercise.instructions,
-    level: exercise.level,
-    images: exercise.images,
-    instructionsZh: generateChineseInstructions(exercise),
-    warnings: searchResult.warnings,
-    mistakes: searchResult.mistakes,
+    ...exercise,
+    name: exercise.name,  // AI 填充中文名
+    instructionsZh: result.instructionsZh || generateChineseInstructions(exercise),
+    warnings: result.warnings,
+    mistakes: result.mistakes,
     ossImages: [],
   }
 }
@@ -175,12 +142,38 @@ async function enrichAll(
 ): Promise<EnrichedExercise[]> {
   const results: EnrichedExercise[] = []
 
-  for (let i = 0; i < exercises.length; i += CONCURRENCY) {
-    const batch = exercises.slice(i, i + CONCURRENCY)
-    const batchResults = await Promise.all(batch.map(enrichExercise))
-    results.push(...batchResults)
+  // 分组并发处理：每次并发 CONCURRENCY 个批次，每个批次 BATCH_SIZE 个动作
+  for (let batchGroupStart = 0; batchGroupStart < exercises.length; batchGroupStart += BATCH_SIZE * CONCURRENCY) {
+    const concurrentPromises: Promise<EnrichedExercise[]>[] = []
 
-    onProgress?.(Math.min(i + CONCURRENCY, exercises.length), exercises.length)
+    for (let j = 0; j < CONCURRENCY; j++) {
+      const start = batchGroupStart + j * BATCH_SIZE
+      const end = Math.min(start + BATCH_SIZE, exercises.length)
+
+      if (start >= exercises.length) break
+
+      const batch = exercises.slice(start, end)
+      concurrentPromises.push(
+        enrichBatch(batch).then(enrichedResults =>
+          batch.map((ex, idx) => ({
+            ...ex,
+            name: enrichedResults[idx]?.name || ex.nameEn || '',
+            instructionsZh: enrichedResults[idx]?.instructionsZh || generateChineseInstructions(ex),
+            warnings: enrichedResults[idx]?.warnings || [],
+            mistakes: enrichedResults[idx]?.mistakes || [],
+            ossImages: [],
+          }))
+        )
+      )
+    }
+
+    const batchResults = await Promise.all(concurrentPromises)
+    for (const batchResult of batchResults) {
+      results.push(...batchResult)
+    }
+
+    const progress = Math.min(batchGroupStart + BATCH_SIZE * CONCURRENCY, exercises.length)
+    onProgress?.(progress, exercises.length)
   }
 
   return results
@@ -197,8 +190,10 @@ function toFinalExercise(enriched: EnrichedExercise) {
     equipment: enriched.equipment,
     primaryMuscles: enriched.primaryMuscles,
     secondaryMuscles: enriched.secondaryMuscles,
-    instructions: enriched.instructionsZh || enriched.instructions,
+    instructions: enriched.instructions,
+    instructionsZh: enriched.instructionsZh || null,
     commonMistakes: enriched.mistakes.join('；') || null,
+    warnings: enriched.warnings.join('；') || null,
     videoUrl: enriched.ossImages.join(',') || null,
     isCustom: false,
     isFavorite: false,
@@ -221,7 +216,7 @@ async function enrich(): Promise<void> {
   const exercises: ProcessedExercise[] = JSON.parse(content)
   console.log(`加载 ${exercises.length} 个动作`)
 
-  console.log('开始AI增强...')
+  console.log(`开始AI增强（每批${BATCH_SIZE}个，并发${CONCURRENCY}）...`)
   const enriched = await enrichAll(exercises, (current, total) => {
     process.stdout.write(`\r进度: ${current}/${total}`)
   })
