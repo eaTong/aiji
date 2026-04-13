@@ -107,14 +107,18 @@ enum PhotoAngle {
 }
 
 model RecoveryStatus {
-  id          String   @id @default(uuid())
-  userId      String
-  date        DateTime @db.Date
-  soreness    Int      @default(0) // 0-10 scale
-  fatigue     Int      @default(0) // 0-10 scale
-  sleepQuality Int     @default(0) // 0-10 scale
-  notes       String?
-  createdAt   DateTime @default(now())
+  id            String   @id @default(uuid())
+  userId        String
+  date          DateTime @db.Date
+  score         Int?     // 0-100, null means not yet computed
+  sleepHours    Float?   // hours of sleep
+  muscleStatus  Json?    // Record<string, number> muscle -> recovery score
+  recommendation String? // REST | LIGHT | TRAIN
+  soreness      Int      @default(0) // 0-10 scale
+  fatigue       Int      @default(0) // 0-10 scale
+  sleepQuality  Int      @default(0) // 0-10 scale
+  notes         String?
+  createdAt     DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
 
