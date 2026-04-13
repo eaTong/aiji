@@ -1,0 +1,42 @@
+{
+    "name" : "AI健身助手",
+    "appid" : "__UNI__5036EB1",
+    "description" : "AI健身助手 - 你的私人健身教练",
+    "versionName" : "1.0.0",
+    "versionCode" : "100",
+    "transformPx" : false,
+    "mp-weixin" : {
+        "appid" : "wxe79d7a77258e35c7",
+        "setting" : {
+            "urlCheck" : false,
+            "es6" : true,
+            "postcss" : true,
+            "minified" : true
+        },
+        "usingComponents" : true,
+        "permission" : {
+            "scope.userLocation" : {
+                "desc" : "获取您的位置以提供个性化健身建议"
+            }
+        },
+        "requiredPrivateInfos" : [ "getLocation" ]
+    },
+    "h5" : {
+        "devServer" : {
+            "port" : 8080,
+            "disableHostCheck" : true,
+            "proxy" : {
+                "/api" : {
+                    "target" : "http://localhost:3000",
+                    "changeOrigin" : true,
+                    "secure" : false
+                }
+            }
+        },
+        "router" : {
+            "mode" : "hash"
+        },
+        "title" : "AI健身助手"
+    },
+    "vueVersion" : "3"
+}

@@ -46,7 +46,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import RecoveryScore from '../../components/recovery/RecoveryScore.vue'
-import { getRecovery, updateSleep } from '../../api/recovery'
+import { getRecovery, postSleep } from '../../api/recovery'
 import { getTrainingLogs } from '../../api/trainingLog'
 
 const recoveryScore = ref(100)
@@ -92,7 +92,7 @@ async function loadRecovery() {
 async function onSleepInput(hours: number) {
   const today = new Date().toISOString().slice(0, 10)
   try {
-    await updateSleep(today, hours)
+    await postSleep({ date: today, sleepHours: hours })
     sleepHours.value = hours
     await loadRecovery()
   } catch (e) {
