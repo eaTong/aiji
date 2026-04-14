@@ -1,14 +1,15 @@
 <template>
   <view class="card-component" :class="cardType">
     <!-- P0 和 P1 专用卡片组件 -->
-    <component
-      :is="resolvedComponent"
-      v-if="cardType && resolvedComponent"
-      :card-data="cardData"
-      :actions="actions"
-      :disabled="disabled"
-      @action="handleAction"
-    />
+    <template v-if="cardType && resolvedComponent">
+      <component
+        :is="resolvedComponent"
+        :card-data="cardData"
+        :actions="actions"
+        :disabled="disabled"
+        @action="handleAction"
+      />
+    </template>
 
     <!-- P2-P3 其他卡片统一渲染 -->
     <LegacyCardRenderer
