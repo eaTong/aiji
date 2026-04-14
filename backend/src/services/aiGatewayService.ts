@@ -1,7 +1,74 @@
 import { PrismaClient } from '@prisma/client'
 import { env } from '../config/env'
+import { logger } from '../logger'
+import { parseTrainingInput } from './trainingRecordParser'
 
 const prisma = new PrismaClient()
+
+// ============================================
+// 工具函数
+// ============================================
+
+/**
+ * 安全解析 JSON，处理 AI 返回的常见格式问题
+ */
+function safeJsonParse(text: string): Record<string, any> | null {
+  // 优先尝试提取 ```json ... ``` 之间的内容
+  const codeBlockMatch = text.match(/```json\s*([\s\S]*?)\s*```/i)
+  let cleaned = codeBlockMatch ? codeBlockMatch[1].trim() : text
+
+  // 尝试直接解析
+  try {
+    return JSON.parse(cleaned)
+  } catch (e) {
+    // 继续尝试修复
+  }
+
+  // 修复常见问题： trailing comma, unquoted keys
+  try {
+    // 移除 trailing comma
+    cleaned = cleaned.replace(/,(\s*[}\]])/g, '$1')
+    // 尝试解析修复后的文本
+    return JSON.parse(cleaned)
+  } catch (e) {
+    // 继续
+  }
+
+  // 如果还是失败，返回 null
+  return null
+}
+
+/**
+ * 从文本中提取 JSON 字符串
+ * 优先提取 ```json ... ``` 之间的内容，否则使用非贪婪匹配 {...}
+ */
+function extractJson(text: string): string | null {
+  // 优先尝试提取 ```json ... ``` 之间的内容（处理 AI 返回的嵌套 JSON）
+  const codeBlockMatch = text.match(/```json\s*([\s\S]*?)\s*```/i)
+  if (codeBlockMatch) {
+    const extracted = codeBlockMatch[1].trim()
+    logger.debug('[extractJson] 从代码块提取:', extracted)
+    return extracted
+  }
+
+  // 尝试从 {"response": "..."} 这样的嵌套格式中提取
+  const nestedMatch = text.match(/"response"\s*:\s*"([\s\S]*?)"\s*[,}]/i)
+  if (nestedMatch) {
+    // 递归从嵌套内容中提取 JSON
+    const nestedContent = nestedMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"')
+    logger.debug('[extractJson] 从嵌套响应提取原始内容')
+    return extractJson(nestedContent)
+  }
+
+  // 否则使用非贪婪匹配 {...}
+  const jsonMatch = text.match(/\{[\s\S]*?\}/)
+  if (jsonMatch) {
+    logger.debug('[extractJson] 从括号提取:', jsonMatch[0])
+    return jsonMatch[0]
+  }
+
+  return null
+}
 
 // ============================================
 // AI 网关服务 - 调用外部 AI 接口
@@ -11,6 +78,7 @@ export interface AIRequest {
   userId: string
   message: string
   conversationHistory?: Array<{ role: string; content: string }>
+  intent?: string  // CHITCHAT 时使用健身教练提示词
 }
 
 export interface AIResponse {
@@ -44,6 +112,28 @@ function buildSystemPrompt(): string {
 5. 可以生成结构化的卡片回复
 
 用户正在健身记录场景中与您对话。请根据用户的消息给出合适的回复。`
+}
+
+/**
+ * 构建健身教练闲聊提示词
+ */
+function buildChitchatSystemPrompt(): string {
+  return `你是一位专业、友善的健身教练，名叫"AI己"。用户正在和你闲聊，请基于用户的健身数据用自然、亲切的方式回应。
+
+你的特点：
+1. 像朋友聊天一样亲切自然，不生硬
+2. 适当给予鼓励和肯定
+3. 根据用户情况分享实用建议
+4. 用轻松的话题拉近距离
+5. 偶尔提醒健身小知识
+
+你可以：
+- 聊健身进展、分享小技巧
+- 给予持续训练的鼓励
+- 轻松回应用户的日常对话
+- 适时引导回到健身话题
+
+回复要简洁，自然、有温度，像朋友聊天一样。不要使用列表或结构化的回复格式，用自然的句子交流。`
 }
 
 /**
@@ -137,7 +227,10 @@ export async function callAI(request: AIRequest): Promise<AIResponse> {
   try {
     // 构建上下文
     const userContext = await buildUserContext(userId)
-    const systemPrompt = buildSystemPrompt()
+    let systemPrompt = buildSystemPrompt()
+    if (request.intent === 'CHITCHAT') {
+      systemPrompt = buildChitchatSystemPrompt()
+    }
 
     // 构建消息列表
     const messages: Array<{ role: string; content: string }> = [
@@ -195,11 +288,11 @@ export async function callAI(request: AIRequest): Promise<AIResponse> {
     }
 
     // 检测意图
-    const intent = detectIntent(message + ' ' + content)
+    const detectedIntent = detectIntent(message + ' ' + content)
 
     return {
       content,
-      intent
+      intent: detectedIntent
     }
   } catch (error: any) {
     if (error.name === 'AbortError') {
@@ -289,18 +382,14 @@ export async function determineIntent(
   userId: string,
   message: string
 ): Promise<{ intent: IntentType; confidence: number }> {
-  // 如果 AI 服务不可用，使用 regex 降级
-  if (!isAIServiceAvailable()) {
-    const fallbackIntent = detectIntentFallback(message)
-    return { intent: fallbackIntent, confidence: 0.5 }
-  }
+  logger.info('[determineIntent] 开始意图判断', { userId, message })
 
-  try {
-    const userContext = await buildUserContext(userId)
+  // 完全依赖 AI 判断意图，不使用本地 regex 降级
+  const userContext = await buildUserContext(userId)
 
-    const response = await callAIInternal({
-      systemPrompt: `你是一个意图分类器。用户消息可能属于以下意图之一：
-- RECORD_WEIGHT: 记录体重（如"今天体重65kg"、"称重130斤"）
+  const response = await callAIInternal({
+    systemPrompt: `你是一个意图分类器。用户消息可能属于以下意图之一：
+- RECORD_WEIGHT: 记录体重（如"今天体重65kg"、"称重130斤"、"记体重83公斤"）
 - RECORD_TRAINING: 记录训练（如"今天练了卧推60kg 8个"、"深蹲100kg 5下"）
 - RECORD_MEASUREMENT: 记录围度（如"今天腰围70cm"、"测了下臂围35"）
 - RECORD_DIET: 记录饮食（如"吃了2000大卡"、"午餐吃了米饭和鸡胸"）
@@ -316,27 +405,30 @@ export async function determineIntent(
 {"intent": "意图名", "confidence": 0.0-1.0}
 
 只返回 JSON，不要有其他内容。`,
-      userMessage: message,
-      userContext
-    })
+    userMessage: message,
+    userContext
+  })
 
-    // 解析 JSON 响应
-    const jsonMatch = response.match(/\{[\s\S]*\}/)
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]) as { intent: string; confidence: number }
+  logger.info('[determineIntent] AI 原始响应:', { response })
+
+  // 解析 JSON 响应
+  const jsonStr = extractJson(response)
+  if (jsonStr) {
+    const parsed = safeJsonParse(jsonStr) as { intent: string; confidence: number } | null
+    if (parsed && parsed.intent) {
       const validIntent = INTENT_LIST.includes(parsed.intent) ? parsed.intent : 'UNKNOWN'
+      logger.info('[determineIntent] 解析成功:', { intent: validIntent, confidence: parsed.confidence })
       return {
         intent: validIntent as IntentType,
         confidence: Math.max(0, Math.min(1, parsed.confidence || 0))
       }
     }
-
-    return { intent: 'UNKNOWN', confidence: 0 }
-  } catch (error) {
-    console.error('[aiGateway] determineIntent error:', error)
-    const fallbackIntent = detectIntentFallback(message)
-    return { intent: fallbackIntent, confidence: 0.3 }
+    logger.warn('[determineIntent] JSON 解析失败或无有效 intent')
+  } else {
+    logger.warn('[determineIntent] 未匹配到 JSON 响应')
   }
+
+  return { intent: 'UNKNOWN', confidence: 0 }
 }
 
 /**
@@ -351,9 +443,14 @@ export async function parseEntities(
   message: string,
   intent: IntentType
 ): Promise<Record<string, any>> {
+  logger.info('[parseEntities] 开始解析实体', { userId, message, intent })
+
   // 如果 AI 服务不可用，使用本地解析
   if (!isAIServiceAvailable()) {
-    return parseEntitiesLocally(message, intent)
+    logger.warn('[parseEntities] AI 服务不可用，使用本地解析')
+    const localResult = parseEntitiesLocally(message, intent)
+    logger.info('[parseEntities] 本地解析结果:', localResult)
+    return localResult
   }
 
   const promptByIntent: Record<string, string> = {
@@ -393,17 +490,32 @@ export async function parseEntities(
       userContext
     })
 
+    logger.info('[parseEntities] AI 原始响应:', { response })
+
     // 解析 JSON 响应
-    const jsonMatch = response.match(/\{[\s\S]*\}/)
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0])
+    const jsonStr = extractJson(response)
+    if (jsonStr) {
+      logger.debug('[parseEntities] 提取的 JSON:', jsonStr)
+      const result = safeJsonParse(jsonStr)
+      if (result) {
+        logger.info('[parseEntities] 解析成功:', result)
+        return result
+      }
+      logger.warn('[parseEntities] JSON 解析失败')
+    } else {
+      logger.warn('[parseEntities] 未匹配到 JSON 响应')
     }
 
-    return {}
+    logger.warn('[parseEntities] AI 解析失败，降级到本地解析')
+    const localResult = parseEntitiesLocally(message, intent)
+    logger.info('[parseEntities] 本地解析结果:', localResult)
+    return localResult
   } catch (error) {
-    console.error('[aiGateway] parseEntities error:', error)
+    logger.error('[aiGateway] parseEntities error:', { error: String(error) })
     // 降级到本地解析
-    return parseEntitiesLocally(message, intent)
+    const localResult = parseEntitiesLocally(message, intent)
+    logger.info('[parseEntities] 异常降级到本地解析:', localResult)
+    return localResult
   }
 }
 
@@ -535,7 +647,11 @@ function parseEntitiesLocally(message: string, intent: IntentType): Record<strin
     }
 
     case 'RECORD_TRAINING': {
-      // 简单的训练解析，可以后续调用 trainingRecordParser
+      // 使用 trainingRecordParser 解析训练数据
+      const parsed = parseTrainingInput(message)
+      if (parsed.exercises.length > 0) {
+        return { exercises: parsed.exercises }
+      }
       return {}
     }
 

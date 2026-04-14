@@ -10,15 +10,11 @@
         <text class="action-icon">💪</text>
         <text class="action-text">记训练</text>
       </view>
-      <view class="action-btn" @click="showDietInput">
-        <text class="action-icon">🍽️</text>
-        <text class="action-text">记饮食</text>
-      </view>
       <view class="action-btn" @click="navigateTo('/pages/data/measurements')">
         <text class="action-icon">📏</text>
         <text class="action-text">记围度</text>
       </view>
-      <view class="action-btn" @click="showQuestionInput">
+      <view class="action-btn" @click="focusInput">
         <text class="action-icon">❓</text>
         <text class="action-text">问教练</text>
       </view>
@@ -142,55 +138,66 @@
 
     <!-- AI 对话区域 -->
     <view class="chat-area">
-      <!-- 问候语卡片 -->
-      <view v-if="chatStore.greeting" class="greeting-card">
-        <view class="card-header">
-          <text class="ai-avatar">🤖</text>
-          <text class="ai-name">AI己</text>
-        </view>
-        <view class="card-body">
-          <template v-if="chatStore.greeting.type === 'text'">
-            <text class="greeting-text">{{ chatStore.greeting.content }}</text>
-          </template>
-          <template v-else-if="chatStore.greeting.type === 'card'">
-            <text class="greeting-text">{{ chatStore.greeting.cardData?.summary || '今天要加油哦！' }}</text>
-            <view v-if="chatStore.greeting.actions" class="card-actions">
-              <button
-                v-for="action in chatStore.greeting.actions"
-                :key="action.id"
-                class="action-btn"
-                @click="handleGreetingAction(action)"
-              >
-                {{ action.label }}
-              </button>
-            </view>
-          </template>
-        </view>
-      </view>
-
-      <!-- 消息列表 -->
+      <!-- 消息列表（包含问候语和所有消息） -->
       <scroll-view
         ref="chatAreaRef"
         class="chat-messages"
         scroll-y
         :scroll-top="chatScrollTop"
       >
+        <!-- 问候语卡片 -->
+        <view v-if="chatStore.greeting" class="greeting-card">
+          <view class="card-header">
+            <text class="ai-avatar">🤖</text>
+            <text class="ai-name">AI己</text>
+          </view>
+          <view class="card-body">
+            <template v-if="chatStore.greeting.type === 'text'">
+              <MarkdownRenderer :content="chatStore.greeting.content" />
+            </template>
+            <template v-else-if="chatStore.greeting.type === 'card'">
+              <text class="greeting-text">{{ chatStore.greeting.cardData?.summary || '今天要加油哦！' }}</text>
+              <view v-if="chatStore.greeting.actions" class="card-actions">
+                <button
+                  v-for="action in chatStore.greeting.actions"
+                  :key="action.id"
+                  class="action-btn"
+                  @click="handleGreetingAction(action)"
+                >
+                  {{ action.label }}
+                </button>
+              </view>
+            </template>
+          </view>
+        </view>
+
+        <!-- 消息列表 -->
         <view
-          v-for="msg in chatStore.messages"
+          v-for="msg in allMessages"
           :key="msg.id"
           class="message-item"
           :class="msg.role"
         >
           <!-- 用户消息 -->
           <view v-if="msg.role === 'user'" class="message-content user">
-            <text>{{ msg.content }}</text>
+            <view class="message-bubble user-bubble">
+              <text>{{ msg.content }}</text>
+            </view>
+          </view>
+
+          <!-- AI 消息 - 思考中 -->
+          <view v-else-if="msg.type === 'thinking'" class="message-content ai">
+            <text class="ai-avatar-sm">🤖</text>
+            <view class="message-bubble thinking-bubble">
+              <text class="thinking-text">🤔 思考中...</text>
+            </view>
           </view>
 
           <!-- AI 消息 - 文本 -->
           <view v-else-if="msg.type === 'text'" class="message-content ai">
             <text class="ai-avatar-sm">🤖</text>
             <view class="message-bubble">
-              <text>{{ msg.content }}</text>
+              <MarkdownRenderer :content="msg.content" />
             </view>
           </view>
 
@@ -202,31 +209,25 @@
                 :card-type="msg.cardType"
                 :card-data="msg.cardData"
                 :actions="msg.actions"
+                :disabled="chatStore.processingMessageId === msg.id"
                 @action="handleCardAction(msg.id, $event)"
               />
             </view>
           </view>
         </view>
       </scroll-view>
+    </view>
 
-      <!-- 聊天输入框 -->
-      <view v-if="showChatInput" class="chat-input-area">
-        <input
-          v-model="chatInput"
-          class="chat-input"
-          placeholder="输入你的问题..."
-          confirm-type="send"
-          @confirm="handleChatSubmit"
-        />
-        <button class="send-btn" @click="handleChatSubmit">发送</button>
-      </view>
-
-      <!-- 快捷聊天按钮 -->
-      <view v-if="!showChatInput && chatStore.messages.length === 0" class="chat-quick-btns">
-        <button class="quick-btn" @click="navigateTo('/pages/data/weight')">📊 记体重</button>
-        <button class="quick-btn" @click="navigateTo('/pages/training/today')">💪 记训练</button>
-        <button class="quick-btn" @click="showChatInput = true">❓ 问教练</button>
-      </view>
+    <!-- 固定在底部的聊天输入框 -->
+    <view class="fixed-chat-input">
+      <input
+        v-model="chatInput"
+        class="chat-input"
+        placeholder="我是你的健身小秘书，什么都可以跟我说哦。"
+        confirm-type="send"
+        @confirm="handleChatSubmit"
+      />
+      <button class="send-btn" @click="handleChatSubmit">发送</button>
     </view>
 
     <!-- 目标选择弹窗 -->
@@ -245,24 +246,33 @@
         </view>
       </view>
     </view>
+
+    <!-- 首次引导弹窗 -->
+    <view v-if="showOnboardingPrompt" class="modal-mask" @click="dismissOnboardingPrompt">
+      <view class="modal-content onboarding-modal" @click.stop>
+        <text class="onboarding-icon">🏋️</text>
+        <text class="onboarding-title">欢迎使用 AI己</text>
+        <text class="onboarding-desc">完成简单的初始化问卷，获取专属训练计划</text>
+        <view class="onboarding-actions">
+          <button class="onboarding-btn primary" @click="startOnboarding">开始初始化</button>
+          <button class="onboarding-btn secondary" @click="dismissOnboardingPrompt">稍后再说</button>
+        </view>
+      </view>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { recommendTraining, type RecommendResponse } from '@/api/training'
 import { useUserStore } from '@/stores/user'
 import { useChatStore } from '@/stores/chat'
+import { getOnboardingStatus } from '@/api/onboarding'
 import CardComponent from '@/components/chat/cards/CardComponent.vue'
+import MarkdownRenderer from '../../components/MarkdownRenderer.vue'
 
 const userStore = useUserStore()
 const chatStore = useChatStore()
-
-// 快捷操作
-const quickActions = [
-  { icon: '📊', text: '记体重', action: '/pages/data/weight' },
-  { icon: '💪', text: '记训练', action: '/pages/training/today' },
-]
 
 // 推荐结果
 const recommendation = ref<RecommendResponse | null>(null)
@@ -271,13 +281,24 @@ const pendingGoalOption = ref<string>('')
 
 // 聊天相关
 const chatInput = ref('')
+const chatInputRef = ref<any>(null)
 const chatAreaRef = ref<any>(null)
-const showChatInput = ref(false)
 const chatScrollTop = ref(0)
+const thinkingMessageId = ref<string | null>(null)
+
+// 合并问候语和消息列表
+const allMessages = computed(() => chatStore.messages)
+
+// 首次引导相关
+const showOnboardingPrompt = ref(false)
+const onboardingDismissed = ref(false)
 
 onMounted(async () => {
   // 初始化聊天
   await chatStore.initialize()
+
+  // 检查是否需要显示引导弹窗
+  checkOnboardingPrompt()
 })
 
 // 目标选项
@@ -292,27 +313,27 @@ function navigateTo(url: string) {
   uni.navigateTo({ url })
 }
 
-function showDietInput() {
-  uni.showToast({ title: '饮食记录（Phase 3）', icon: 'none' })
-}
-
-function showQuestionInput() {
-  showChatInput.value = true
+function focusInput() {
+  chatInputRef.value?.focus()
 }
 
 async function handleChatSubmit() {
   const content = chatInput.value.trim()
-  if (!content) return
+  if (!content || chatStore.isLoading) return
 
   chatInput.value = ''
-  showChatInput.value = false
 
+  // 发送消息（内部会先显示用户消息和"思考中"）
   await chatStore.sendMessage(content)
 
   // 滚动到底部
   await nextTick()
+  scrollToBottom()
+}
+
+function scrollToBottom() {
   if (chatAreaRef.value) {
-    chatAreaRef.value.scrollTop = chatAreaRef.value.scrollHeight
+    chatAreaRef.value.scrollTop = chatAreaRef.value.scrollHeight + 1000
   }
 }
 
@@ -424,6 +445,33 @@ function getScoreClass(score: number): string {
   if (score >= 50) return 'score-warning'
   return 'score-danger'
 }
+
+// 首次引导相关
+async function checkOnboardingPrompt() {
+  // 如果已经弹过或者显示过，就不再弹
+  if (onboardingDismissed.value) return
+
+  try {
+    const status = await getOnboardingStatus()
+    if (!status.hasCompletedOnboarding) {
+      // 未完成引导，显示弹窗
+      showOnboardingPrompt.value = true
+    }
+  } catch (e) {
+    // 如果出错，不显示弹窗
+    console.error('检查引导状态失败', e)
+  }
+}
+
+function dismissOnboardingPrompt() {
+  showOnboardingPrompt.value = false
+  onboardingDismissed.value = true
+}
+
+function startOnboarding() {
+  showOnboardingPrompt.value = false
+  uni.navigateTo({ url: '/pages/onboarding/index' })
+}
 </script>
 
 <style lang="scss" scoped>
@@ -431,13 +479,15 @@ function getScoreClass(score: number): string {
   min-height: 100vh;
   background-color: #f5f5f5;
   padding: 20rpx;
+  padding-bottom: 120rpx;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 快捷操作栏 */
 .quick-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 16rpx;
+  justify-content: space-between;
   padding: 20rpx;
   background: #fff;
   border-radius: 16rpx;
@@ -449,8 +499,8 @@ function getScoreClass(score: number): string {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-width: 100rpx;
-  padding: 16rpx 12rpx;
+  width: 120rpx;
+  padding: 16rpx 8rpx;
   background: #f8f8f8;
   border-radius: 12rpx;
   cursor: pointer;
@@ -723,8 +773,9 @@ function getScoreClass(score: number): string {
   border-radius: 16rpx;
   padding: 24rpx;
   min-height: 400rpx;
-  display: flex;
-  flex-direction: column;
+  flex:1;
+  // display: flex;
+  // flex-direction: column;
 }
 
 .chat-placeholder {
@@ -844,6 +895,15 @@ function getScoreClass(score: number): string {
   overflow: hidden;
 }
 
+.thinking-bubble {
+  background: #f0f0f0 !important;
+}
+
+.thinking-text {
+  color: #999;
+  font-style: italic;
+}
+
 /* 聊天输入 */
 .chat-input-area {
   display: flex;
@@ -852,21 +912,42 @@ function getScoreClass(score: number): string {
   border-top: 1rpx solid #eee;
 }
 
+/* 固定在底部的聊天输入框 */
+.fixed-chat-input {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 20rpx;
+  /* #ifdef H5 */
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  /* #endif */
+  background: #fff;
+  box-shadow: 0 -4rpx 20rpx rgba(0, 0, 0, 0.05);
+}
+
 .chat-input {
   flex: 1;
-  padding: 16rpx 20rpx;
+  height: 80rpx;
+  padding: 0 24rpx;
   background: #f5f5f5;
-  border-radius: 36rpx;
+  border-radius: 40rpx;
   font-size: 28rpx;
+  line-height: 80rpx;
 }
 
 .send-btn {
-  padding: 16rpx 32rpx;
+  height: 80rpx;
+  padding: 0 32rpx;
   background: #07c160;
   color: #fff;
-  border-radius: 36rpx;
+  border-radius: 40rpx;
   font-size: 28rpx;
   border: none;
+  line-height: 80rpx;
 }
 
 /* 快捷聊天按钮 */
@@ -930,5 +1011,58 @@ function getScoreClass(score: number): string {
   font-size: 28rpx;
   color: #333;
   border: none;
+}
+
+/* 首次引导弹窗 */
+.onboarding-modal {
+  text-align: center;
+  padding: 60rpx 40rpx;
+}
+
+.onboarding-icon {
+  font-size: 100rpx;
+  display: block;
+  margin-bottom: 32rpx;
+}
+
+.onboarding-title {
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #333;
+  display: block;
+  margin-bottom: 16rpx;
+}
+
+.onboarding-desc {
+  font-size: 28rpx;
+  color: #666;
+  display: block;
+  margin-bottom: 48rpx;
+  line-height: 1.5;
+}
+
+.onboarding-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.onboarding-btn {
+  height: 96rpx;
+  line-height: 96rpx;
+  border-radius: 48rpx;
+  font-size: 32rpx;
+  font-weight: bold;
+  border: none;
+}
+
+.onboarding-btn.primary {
+  background: linear-gradient(135deg, #07c160, #06ad56);
+  color: #fff;
+}
+
+.onboarding-btn.secondary {
+  background: #f5f5f5;
+  color: #666;
 }
 </style>

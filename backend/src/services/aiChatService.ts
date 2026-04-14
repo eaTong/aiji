@@ -57,7 +57,7 @@ export async function chat(
       return await generateWeightTrendResponse(userId)
 
     default:
-      return await generateDefaultResponse(userId, message)
+      return await generateDefaultResponse(userId, message, intent)
   }
 }
 
@@ -711,12 +711,13 @@ async function generateGreetingResponse(userId: string): Promise<any> {
  */
 async function generateDefaultResponse(
   userId: string,
-  message: string
+  message: string,
+  intent: string = 'UNKNOWN'
 ): Promise<any> {
   // 尝试调用 AI 接口
   if (isAIServiceAvailable()) {
     try {
-      const response = await callAI({ userId, message })
+      const response = await callAI({ userId, message, intent })
 
       if (response.content) {
         // 构建回复动作
