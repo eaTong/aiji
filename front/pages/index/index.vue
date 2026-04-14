@@ -474,7 +474,7 @@ function startOnboarding() {
 
 /* 快捷操作栏 */
 .quick-actions {
-  display: flex-box;
+  display: flex;
   justify-content: space-between;
   padding: 20rpx;
   background: #fff;
