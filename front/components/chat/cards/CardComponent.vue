@@ -1,15 +1,67 @@
 <template>
   <view class="card-component" :class="cardType">
-    <!-- P0 和 P1 专用卡片组件 -->
-    <template v-if="cardType && resolvedComponent">
-      <component
-        :is="resolvedComponent"
-        :card-data="cardData"
-        :actions="actions"
-        :disabled="disabled"
-        @action="handleAction"
-      />
-    </template>
+    <!-- weight-record 卡片 -->
+    <WeightRecordCard
+      v-if="cardType === 'weight-record'"
+      :card-data="(cardData as any)"
+      :actions="actions"
+      :disabled="disabled"
+      @action="handleAction"
+    />
+
+    <!-- training-recommend 卡片 -->
+    <TrainingRecommendCard
+      v-else-if="cardType === 'training-recommend'"
+      :card-data="(cardData as any)"
+      :actions="actions"
+      :disabled="disabled"
+      @action="handleAction"
+    />
+
+    <!-- training-editable 卡片 -->
+    <TrainingEditableCard
+      v-else-if="cardType === 'training-editable'"
+      :card-data="(cardData as any)"
+      :actions="actions"
+      :disabled="disabled"
+      @action="handleAction"
+    />
+
+    <!-- recovery-status 卡片 -->
+    <RecoveryStatusCard
+      v-else-if="cardType === 'recovery-status'"
+      :card-data="(cardData as any)"
+      :actions="actions"
+      :disabled="disabled"
+      @action="handleAction"
+    />
+
+    <!-- morning-report 卡片 -->
+    <MorningReportCard
+      v-else-if="cardType === 'morning-report'"
+      :card-data="(cardData as any)"
+      :actions="actions"
+      :disabled="disabled"
+      @action="handleAction"
+    />
+
+    <!-- weekly-report 卡片 -->
+    <WeeklyReportCard
+      v-else-if="cardType === 'weekly-report'"
+      :card-data="(cardData as any)"
+      :actions="actions"
+      :disabled="disabled"
+      @action="handleAction"
+    />
+
+    <!-- achievement 卡片 -->
+    <AchievementCard
+      v-else-if="cardType === 'achievement'"
+      :card-data="(cardData as any)"
+      :actions="actions"
+      :disabled="disabled"
+      @action="handleAction"
+    />
 
     <!-- P2-P3 其他卡片统一渲染 -->
     <LegacyCardRenderer
@@ -29,10 +81,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import {
-  cardTypeMap,
-  LegacyCardRenderer
+  LegacyCardRenderer,
+  WeightRecordCard,
+  TrainingRecommendCard,
+  TrainingEditableCard,
+  RecoveryStatusCard,
+  MorningReportCard,
+  WeeklyReportCard,
+  AchievementCard
 } from './index'
 
 const props = defineProps<{
@@ -45,12 +102,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   action: [actionId: string]
 }>()
-
-// 解析组件，TypeScript 需要显式类型转换
-const resolvedComponent = computed(() => {
-  if (!props.cardType) return null
-  return (cardTypeMap as Record<string, any>)[props.cardType] || null
-})
 
 function handleAction(actionId: string) {
   emit('action', actionId)
