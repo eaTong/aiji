@@ -431,3 +431,92 @@ export async function deletePlan(planId: string): Promise<void> {
     where: { id: planId },
   })
 }
+
+// ============== Exercise Replacement ==============
+
+export type ReplacementReason = 'not_interested' | 'no_equipment' | 'dont_know_how' | 'other'
+
+export interface ReplaceExerciseInput {
+  plannedExerciseId: string
+  newExerciseId: string
+  reason: ReplacementReason
+}
+
+/**
+ * 替换计划中的动作
+ */
+export async function replaceExercise(input: ReplaceExerciseInput) {
+  const { plannedExerciseId, newExerciseId, reason } = input
+
+  // 获取原计划动作
+  const plannedExercise = await prisma.plannedExercise.findUnique({
+    where: { id: plannedExerciseId },
+    include: { exercise: true },
+  })
+
+  if (!plannedExercise) {
+    throw Object.assign(new Error('Planned exercise not found'), { status: 404 })
+  }
+
+  // 验证新动作存在
+  const newExercise = await prisma.exercise.findUnique({
+    where: { id: newExerciseId },
+  })
+
+  if (!newExercise) {
+    throw Object.assign(new Error('New exercise not found'), { status: 404 })
+  }
+
+  // 记录替换历史并更新动作
+  const [replacement, updatedExercise] = await prisma.$transaction([
+    prisma.planExerciseReplacement.create({
+      data: {
+        plannedExerciseId,
+        originalExerciseId: plannedExercise.exerciseId,
+        newExerciseId,
+        reason,
+      },
+    }),
+    prisma.plannedExercise.update({
+      where: { id: plannedExerciseId },
+      data: { exerciseId: newExerciseId },
+      include: { exercise: true },
+    }),
+  ])
+
+  return {
+    replacement,
+    updatedExercise,
+  }
+}
+
+/**
+ * 获取可替换的动作列表（同一类别的其他动作）
+ */
+export async function getReplacableExercises(plannedExerciseId: string) {
+  const plannedExercise = await prisma.plannedExercise.findUnique({
+    where: { id: plannedExerciseId },
+    include: { exercise: true },
+  })
+
+  if (!plannedExercise) {
+    throw Object.assign(new Error('Planned exercise not found'), { status: 404 })
+  }
+
+  const currentExercise = plannedExercise.exercise
+
+  // 查找同一类别（category）的其他动作
+  const replacableExercises = await prisma.exercise.findMany({
+    where: {
+      category: currentExercise.category,
+      id: { not: currentExercise.id },
+      isCustom: false,
+    },
+    take: 20,
+  })
+
+  return {
+    currentExercise,
+    replacableExercises,
+  }
+}
