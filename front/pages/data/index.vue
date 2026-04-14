@@ -21,6 +21,10 @@
         <text class="entry-icon">📏</text>
         <text class="entry-label">围度</text>
       </view>
+      <view class="entry-item" @tap="goTo('supplements')">
+        <text class="entry-icon">💊</text>
+        <text class="entry-label">补剂</text>
+      </view>
       <view class="entry-item" @tap="goTo('photos')">
         <text class="entry-icon">📷</text>
         <text class="entry-label">照片</text>

@@ -61,5 +61,6 @@ afterEach(async () => {
   await prisma.progressPhoto.deleteMany({ where: { userId: { in: ids } } })
   await prisma.measurementRecord.deleteMany({ where: { userId: { in: ids } } })
   await prisma.weightRecord.deleteMany({ where: { userId: { in: ids } } })
+  await prisma.supplementRecord.deleteMany({ where: { userId: { in: ids } } })
   await prisma.user.deleteMany({ where: { id: { in: ids } } })
 })

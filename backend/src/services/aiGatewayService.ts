@@ -194,6 +194,23 @@ async function buildUserContext(userId: string): Promise<string> {
       orderBy: { recordedAt: 'desc' }
     })
 
+    // 获取最近补剂记录
+    const recentSupplements = await prisma.supplementRecord.findMany({
+      where: { userId },
+      orderBy: { date: 'desc' },
+      take: 5
+    })
+
+    let supplementText = '暂无补剂记录'
+    if (recentSupplements.length > 0) {
+      supplementText = recentSupplements.map(r => {
+        const date = r.date.toISOString().split('T')[0]
+        const dosage = r.dosage ? ` (${r.dosage})` : ''
+        const timing = r.timing ? ` ${r.timing}` : ''
+        return `${date} - ${r.supplement}${dosage}${timing}`
+      }).join('\n')
+    }
+
     return `
 当前用户信息：
 - 昵称: ${user.nickname || '用户'}
@@ -203,6 +220,9 @@ async function buildUserContext(userId: string): Promise<string> {
 
 最近训练记录：
 ${recentTrainingText}
+
+补剂使用情况：
+${supplementText}
 `.trim()
   } catch (error) {
     console.error('[aiGateway] buildUserContext error:', error)

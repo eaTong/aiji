@@ -27,6 +27,7 @@ model User {
   weightRecords      WeightRecord[]
   measurementRecords MeasurementRecord[]
   progressPhotos     ProgressPhoto[]
+  supplementRecords  SupplementRecord[]
   exercises          Exercise[]
   recoveryStatuses   RecoveryStatus[]
   logEntries         LogEntry[]
@@ -69,6 +70,21 @@ model MeasurementRecord {
   createdAt   DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+}
+
+model SupplementRecord {
+  id          String   @id @default(uuid())
+  userId      String
+  date        DateTime @db.Date
+  supplement  String
+  dosage      String?
+  timing      String?
+  note        String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date, supplement])
 }
 
 model ProgressPhoto {

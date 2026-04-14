@@ -5,6 +5,7 @@
     { "path": "pages/data/weight", "style": { "navigationBarTitleText": "体重记录" } },
     { "path": "pages/data/measurements", "style": { "navigationBarTitleText": "围度记录" } },
     { "path": "pages/data/photos", "style": { "navigationBarTitleText": "进度照片" } },
+    { "path": "pages/data/supplements", "style": { "navigationBarTitleText": "补剂记录" } },
     { "path": "pages/training/index", "style": { "navigationBarTitleText": "训练" } },
     { "path": "pages/training/library", "style": { "navigationBarTitleText": "动作库" } },
     { "path": "pages/training/exercise-detail", "style": { "navigationBarTitleText": "动作详情" } },
