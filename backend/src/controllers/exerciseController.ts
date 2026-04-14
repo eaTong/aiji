@@ -22,8 +22,14 @@ export async function listExercises(ctx: Context) {
   }
 
   if (favorites === 'true') {
+    const userId = (ctx as AuthContext).state.user?.userId
+    if (!userId) {
+      ctx.status = 401
+      ctx.body = { code: 401, message: '未授权', data: null }
+      return
+    }
     filter.favorites = true
-    filter.userId = (ctx as AuthContext).state.user.userId
+    filter.userId = userId
   }
 
   const exercises = await getExercises(filter)

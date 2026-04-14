@@ -6,6 +6,7 @@ const config: Config = {
   roots: ['<rootDir>/tests'],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   testTimeout: 10000,
+  maxWorkers: 1,
 }
 
 export default config

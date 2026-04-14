@@ -20,7 +20,7 @@ export async function getRecoveryStatusHandler(ctx: Context) {
   }
 
   // Normalize to start of day
-  date.setHours(0, 0, 0, 0)
+  date.setUTCHours(0, 0, 0, 0)
 
   const status = await getRecoveryStatus(userId, date)
   ctx.body = success(status)

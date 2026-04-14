@@ -1,98 +1,11 @@
 <template>
   <view class="silhouette-container">
-    <svg
-      class="body-svg"
-      viewBox="0 0 200 420"
-      width="320rpx"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <!-- Head (non-clickable) -->
-      <ellipse cx="100" cy="30" rx="18" ry="22" fill="#ccc" />
-
-      <!-- Neck -->
-      <rect x="92" y="50" width="16" height="12" fill="#ccc" />
-
-      <!-- Chest (upper torso) -->
-      <path
-        :fill="hasData('chest') ? '#333' : '#D0D0D0'"
-        class="hotspot"
-        data-part="chest"
-        @tap="onTap('chest')"
-        d="M68 62 L132 62 L135 105 L65 105 Z"
-      />
-
-      <!-- Waist (mid torso) -->
-      <path
-        :fill="hasData('waist') ? '#333' : '#D0D0D0'"
-        class="hotspot"
-        data-part="waist"
-        @tap="onTap('waist')"
-        d="M70 108 L130 108 L128 140 L72 140 Z"
-      />
-
-      <!-- Hip (lower torso) -->
-      <path
-        :fill="hasData('hip') ? '#333' : '#D0D0D0'"
-        class="hotspot"
-        data-part="hip"
-        @tap="onTap('hip')"
-        d="M72 143 L128 143 L125 180 L75 180 Z"
-      />
-
-      <!-- Left Arm -->
-      <path
-        :fill="hasData('leftArm') ? '#333' : '#D0D0D0'"
-        class="hotspot"
-        data-part="leftArm"
-        @tap="onTap('leftArm')"
-        d="M48 65 L64 62 L60 130 L44 125 Z"
-      />
-
-      <!-- Right Arm -->
-      <path
-        :fill="hasData('rightArm') ? '#333' : '#D0D0D0'"
-        class="hotspot"
-        data-part="rightArm"
-        @tap="onTap('rightArm')"
-        d="M136 62 L152 65 L156 125 L140 130 Z"
-      />
-
-      <!-- Left Thigh -->
-      <path
-        :fill="hasData('leftThigh') ? '#333' : '#D0D0D0'"
-        class="hotspot"
-        data-part="leftThigh"
-        @tap="onTap('leftThigh')"
-        d="M75 183 L100 183 L98 270 L73 270 Z"
-      />
-
-      <!-- Right Thigh -->
-      <path
-        :fill="hasData('rightThigh') ? '#333' : '#D0D0D0'"
-        class="hotspot"
-        data-part="rightThigh"
-        @tap="onTap('rightThigh')"
-        d="M100 183 L125 183 L127 270 L102 270 Z"
-      />
-
-      <!-- Left Calf -->
-      <path
-        :fill="hasData('leftCalf') ? '#333' : '#D0D0D0'"
-        class="hotspot"
-        data-part="leftCalf"
-        @tap="onTap('leftCalf')"
-        d="M73 273 L98 273 L95 360 L72 360 Z"
-      />
-
-      <!-- Right Calf -->
-      <path
-        :fill="hasData('rightCalf') ? '#333' : '#D0D0D0'"
-        class="hotspot"
-        data-part="rightCalf"
-        @tap="onTap('rightCalf')"
-        d="M102 273 L127 273 L128 360 L105 360 Z"
-      />
-    </svg>
+    <canvas
+      class="body-canvas"
+      canvas-id="bodySilhouette"
+      :style="{ width: canvasWidth + 'px', height: canvasHeight + 'px' }"
+      @tap="onTap"
+    />
 
     <!-- Legend -->
     <view class="legend">
@@ -101,7 +14,7 @@
         <text class="legend-text">未录入</text>
       </view>
       <view class="legend-item">
-        <view class="legend-dot" style="background: #333;"></view>
+        <view class="legend-dot" style="background: #07c160;"></view>
         <text class="legend-text">已录入</text>
       </view>
     </view>
@@ -109,7 +22,16 @@
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted, watch } from 'vue'
+
 export type PartKey = 'chest' | 'waist' | 'hip' | 'leftArm' | 'rightArm' | 'leftThigh' | 'rightThigh' | 'leftCalf' | 'rightCalf'
+
+// 身体部位定义
+interface BodyPart {
+  key: PartKey
+  path: { x: number; y: number }[]
+  bounds: { minX: number; minY: number; maxX: number; maxY: number }
+}
 
 const props = defineProps<{
   data?: Partial<Record<PartKey, number>>
@@ -119,16 +41,181 @@ const emit = defineEmits<{
   (e: 'tap', part: PartKey): void
 }>()
 
+// Canvas 尺寸
+const canvasWidth = 200
+const canvasHeight = 420
+
+// 身体部位路径和边界（基于 200x420 的坐标系）
+const bodyParts: BodyPart[] = [
+  {
+    key: 'chest',
+    path: [
+      { x: 68, y: 62 }, { x: 132, y: 62 },
+      { x: 135, y: 105 }, { x: 65, y: 105 }
+    ],
+    bounds: { minX: 65, minY: 62, maxX: 135, maxY: 105 }
+  },
+  {
+    key: 'waist',
+    path: [
+      { x: 70, y: 108 }, { x: 130, y: 108 },
+      { x: 128, y: 140 }, { x: 72, y: 140 }
+    ],
+    bounds: { minX: 70, minY: 108, maxX: 130, maxY: 140 }
+  },
+  {
+    key: 'hip',
+    path: [
+      { x: 72, y: 143 }, { x: 128, y: 143 },
+      { x: 125, y: 180 }, { x: 75, y: 180 }
+    ],
+    bounds: { minX: 72, minY: 143, maxX: 128, maxY: 180 }
+  },
+  {
+    key: 'leftArm',
+    path: [
+      { x: 48, y: 65 }, { x: 64, y: 62 },
+      { x: 60, y: 130 }, { x: 44, y: 125 }
+    ],
+    bounds: { minX: 44, minY: 62, maxX: 64, maxY: 130 }
+  },
+  {
+    key: 'rightArm',
+    path: [
+      { x: 136, y: 62 }, { x: 152, y: 65 },
+      { x: 156, y: 125 }, { x: 140, y: 130 }
+    ],
+    bounds: { minX: 136, minY: 62, maxX: 156, maxY: 130 }
+  },
+  {
+    key: 'leftThigh',
+    path: [
+      { x: 75, y: 183 }, { x: 100, y: 183 },
+      { x: 98, y: 270 }, { x: 73, y: 270 }
+    ],
+    bounds: { minX: 73, minY: 183, maxX: 100, maxY: 270 }
+  },
+  {
+    key: 'rightThigh',
+    path: [
+      { x: 100, y: 183 }, { x: 125, y: 183 },
+      { x: 127, y: 270 }, { x: 102, y: 270 }
+    ],
+    bounds: { minX: 100, minY: 183, maxX: 127, maxY: 270 }
+  },
+  {
+    key: 'leftCalf',
+    path: [
+      { x: 73, y: 273 }, { x: 98, y: 273 },
+      { x: 95, y: 360 }, { x: 72, y: 360 }
+    ],
+    bounds: { minX: 72, minY: 273, maxX: 98, maxY: 360 }
+  },
+  {
+    key: 'rightCalf',
+    path: [
+      { x: 102, y: 273 }, { x: 127, y: 273 },
+      { x: 128, y: 360 }, { x: 105, y: 360 }
+    ],
+    bounds: { minX: 102, minY: 273, maxX: 128, maxY: 360 }
+  }
+]
+
 function hasData(part: PartKey): boolean {
   return props.data?.[part] !== undefined && props.data?.[part] !== null
 }
 
-function onTap(part: PartKey) {
-  emit('tap', part)
+function isPointInPolygon(x: number, y: number, polygon: { x: number; y: number }[]): boolean {
+  let inside = false
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x, yi = polygon[i].y
+    const xj = polygon[j].x, yj = polygon[j].y
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+      inside = !inside
+    }
+  }
+  return inside
 }
+
+function hitTest(x: number, y: number): PartKey | null {
+  // 坐标转换：canvas 坐标到 SVG 坐标
+  const scaleX = 200 / canvasWidth
+  const scaleY = 420 / canvasHeight
+  const svgX = x * scaleX
+  const svgY = y * scaleY
+
+  for (const part of bodyParts) {
+    if (isPointInPolygon(svgX, svgY, part.path)) {
+      return part.key
+    }
+  }
+  return null
+}
+
+function onTap(e: any) {
+  const { x, y } = e.detail || e
+  if (x !== undefined && y !== undefined) {
+    const part = hitTest(x, y)
+    if (part) {
+      emit('tap', part)
+    }
+  }
+}
+
+function draw() {
+  const ctx = uni.createCanvasContext('bodySilhouette')
+
+  // 清空画布
+  ctx.clearRect(0, 0, canvasWidth, canvasHeight)
+
+  // 绘制头部（椭圆）
+  ctx.beginPath()
+  ctx.ellipse(100, 30, 18, 22, 0, 0, 2 * Math.PI)
+  ctx.setFillStyle('#ccc')
+  ctx.fill()
+
+  // 绘制颈部
+  ctx.beginPath()
+  ctx.rect(92, 50, 16, 12)
+  ctx.setFillStyle('#ccc')
+  ctx.fill()
+
+  // 绘制身体部位
+  for (const part of bodyParts) {
+    const filled = hasData(part.key)
+    ctx.beginPath()
+    ctx.moveTo(part.path[0].x, part.path[0].y)
+    for (let i = 1; i < part.path.length; i++) {
+      ctx.lineTo(part.path[i].x, part.path[i].y)
+    }
+    ctx.closePath()
+    ctx.setFillStyle(filled ? '#07c160' : '#D0D0D0')
+    ctx.fill()
+
+    // 如果有数据，在部位中心显示数值
+    if (filled && props.data?.[part.key] !== undefined) {
+      ctx.setFontSize(10)
+      ctx.setFillStyle('#fff')
+      ctx.setTextAlign('center')
+      ctx.setTextBaseline('middle')
+      const centerX = (part.bounds.minX + part.bounds.maxX) / 2
+      const centerY = (part.bounds.minY + part.bounds.maxY) / 2
+      ctx.fillText(String(props.data[part.key]), centerX, centerY)
+    }
+  }
+
+  ctx.draw()
+}
+
+// 监听数据变化，重新绘制
+watch(() => props.data, draw, { deep: true })
+
+onMounted(() => {
+  draw()
+})
 </script>
 
-<style>
+<style scoped>
 .silhouette-container {
   display: flex;
   flex-direction: column;
@@ -136,17 +223,8 @@ function onTap(part: PartKey) {
   padding: 24rpx;
 }
 
-.body-svg {
+.body-canvas {
   display: block;
-}
-
-.hotspot {
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
-
-.hotspot:active {
-  opacity: 0.7;
 }
 
 .legend {

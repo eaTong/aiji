@@ -140,10 +140,92 @@
       </view>
     </view>
 
-    <!-- AI 对话区域（占位） -->
+    <!-- AI 对话区域 -->
     <view class="chat-area">
-      <view class="chat-placeholder">
-        <text>AI对话功能（Phase 3 实现）</text>
+      <!-- 问候语卡片 -->
+      <view v-if="chatStore.greeting" class="greeting-card">
+        <view class="card-header">
+          <text class="ai-avatar">🤖</text>
+          <text class="ai-name">AI己</text>
+        </view>
+        <view class="card-body">
+          <template v-if="chatStore.greeting.type === 'text'">
+            <text class="greeting-text">{{ chatStore.greeting.content }}</text>
+          </template>
+          <template v-else-if="chatStore.greeting.type === 'card'">
+            <text class="greeting-text">{{ chatStore.greeting.cardData?.summary || '今天要加油哦！' }}</text>
+            <view v-if="chatStore.greeting.actions" class="card-actions">
+              <button
+                v-for="action in chatStore.greeting.actions"
+                :key="action.id"
+                class="action-btn"
+                @click="handleGreetingAction(action)"
+              >
+                {{ action.label }}
+              </button>
+            </view>
+          </template>
+        </view>
+      </view>
+
+      <!-- 消息列表 -->
+      <scroll-view
+        ref="chatAreaRef"
+        class="chat-messages"
+        scroll-y
+        :scroll-top="chatScrollTop"
+      >
+        <view
+          v-for="msg in chatStore.messages"
+          :key="msg.id"
+          class="message-item"
+          :class="msg.role"
+        >
+          <!-- 用户消息 -->
+          <view v-if="msg.role === 'user'" class="message-content user">
+            <text>{{ msg.content }}</text>
+          </view>
+
+          <!-- AI 消息 - 文本 -->
+          <view v-else-if="msg.type === 'text'" class="message-content ai">
+            <text class="ai-avatar-sm">🤖</text>
+            <view class="message-bubble">
+              <text>{{ msg.content }}</text>
+            </view>
+          </view>
+
+          <!-- AI 消息 - 卡片 -->
+          <view v-else-if="msg.type === 'card'" class="message-content ai">
+            <text class="ai-avatar-sm">🤖</text>
+            <view class="message-bubble card-bubble">
+              <card-component
+                :card-type="msg.cardType"
+                :card-data="msg.cardData"
+                :actions="msg.actions"
+                @action="handleCardAction(msg.id, $event)"
+              />
+            </view>
+          </view>
+        </view>
+      </scroll-view>
+
+      <!-- 聊天输入框 -->
+      <view v-if="showChatInput" class="chat-input-area">
+        <input
+          v-model="chatInput"
+          class="chat-input"
+          placeholder="输入你的问题..."
+          confirm-type="send"
+          @confirm="handleChatSubmit"
+        />
+        <button class="send-btn" @click="handleChatSubmit">发送</button>
+      </view>
+
+      <!-- 快捷聊天按钮 -->
+      <view v-if="!showChatInput && chatStore.messages.length === 0" class="chat-quick-btns">
+        <button class="quick-btn" @click="navigateTo('/pages/data/weight')">📊 记体重</button>
+        <button class="quick-btn" @click="navigateTo('/pages/training/today')">💪 记训练</button>
+        <button class="quick-btn" @click="showChatInput = true">❓ 问教练</button>
       </view>
     </view>
 
@@ -167,11 +249,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { recommendTraining, type RecommendResponse } from '@/api/training'
 import { useUserStore } from '@/stores/user'
+import { useChatStore } from '@/stores/chat'
+import CardComponent from '@/components/chat/cards/CardComponent.vue'
 
 const userStore = useUserStore()
+const chatStore = useChatStore()
 
 // 快捷操作
 const quickActions = [
@@ -183,6 +268,17 @@ const quickActions = [
 const recommendation = ref<RecommendResponse | null>(null)
 const showGoalModal = ref(false)
 const pendingGoalOption = ref<string>('')
+
+// 聊天相关
+const chatInput = ref('')
+const chatAreaRef = ref<any>(null)
+const showChatInput = ref(false)
+const chatScrollTop = ref(0)
+
+onMounted(async () => {
+  // 初始化聊天
+  await chatStore.initialize()
+})
 
 // 目标选项
 const goalOptions = [
@@ -201,7 +297,51 @@ function showDietInput() {
 }
 
 function showQuestionInput() {
-  uni.showToast({ title: 'AI问答（Phase 3）', icon: 'none' })
+  showChatInput.value = true
+}
+
+async function handleChatSubmit() {
+  const content = chatInput.value.trim()
+  if (!content) return
+
+  chatInput.value = ''
+  showChatInput.value = false
+
+  await chatStore.sendMessage(content)
+
+  // 滚动到底部
+  await nextTick()
+  if (chatAreaRef.value) {
+    chatAreaRef.value.scrollTop = chatAreaRef.value.scrollHeight
+  }
+}
+
+async function handleCardAction(messageId: string, actionId: string) {
+  await chatStore.handleCardAction(messageId, actionId)
+}
+
+function handleGreetingAction(action: { id: string; label: string; action: string; target?: string }) {
+  switch (action.action) {
+    case 'navigate':
+      if (action.target) {
+        uni.navigateTo({ url: action.target })
+      }
+      break
+    case 'dismiss':
+      // 关闭问候卡片
+      chatStore.greeting = null
+      break
+    case 'start':
+      if (action.target) {
+        uni.navigateTo({ url: action.target })
+      }
+      break
+    case 'confirm':
+      // 确认
+      break
+    default:
+      uni.showToast({ title: action.label, icon: 'none' })
+  }
 }
 
 async function handleRecommendTraining() {
@@ -581,8 +721,10 @@ function getScoreClass(score: number): string {
 .chat-area {
   background: #fff;
   border-radius: 16rpx;
-  padding: 40rpx;
+  padding: 24rpx;
   min-height: 400rpx;
+  display: flex;
+  flex-direction: column;
 }
 
 .chat-placeholder {
@@ -592,6 +734,156 @@ function getScoreClass(score: number): string {
   height: 300rpx;
   color: #ccc;
   font-size: 28rpx;
+}
+
+/* 问候卡片 */
+.greeting-card {
+  background: linear-gradient(135deg, #07c160 0%, #06ad56 100%);
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  color: #fff;
+}
+
+.greeting-card .card-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12rpx;
+  padding-bottom: 12rpx;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.3);
+}
+
+.greeting-card .ai-avatar {
+  font-size: 36rpx;
+  margin-right: 12rpx;
+}
+
+.greeting-card .ai-name {
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.greeting-card .card-body {
+  font-size: 28rpx;
+}
+
+.greeting-text {
+  display: block;
+  line-height: 1.6;
+}
+
+.greeting-card .card-actions {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 16rpx;
+}
+
+.greeting-card .action-btn {
+  flex: 1;
+  padding: 12rpx 16rpx;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1rpx solid rgba(255, 255, 255, 0.3);
+  border-radius: 24rpx;
+  color: #fff;
+  font-size: 24rpx;
+}
+
+/* 消息列表 */
+.chat-messages {
+  flex: 1;
+  max-height: 500rpx;
+  overflow-y: auto;
+  margin-bottom: 20rpx;
+}
+
+.message-item {
+  display: flex;
+  margin-bottom: 20rpx;
+}
+
+.message-item.user {
+  justify-content: flex-end;
+}
+
+.message-item.ai {
+  justify-content: flex-start;
+}
+
+.message-content {
+  max-width: 80%;
+  display: flex;
+  align-items: flex-start;
+}
+
+.message-content.user .message-bubble {
+  background: #07c160;
+  color: #fff;
+  border-radius: 24rpx 24rpx 4rpx 24rpx;
+  padding: 16rpx 20rpx;
+  font-size: 28rpx;
+  line-height: 1.4;
+}
+
+.message-content.ai .message-bubble {
+  background: #f0f0f0;
+  color: #333;
+  border-radius: 24rpx 24rpx 24rpx 4rpx;
+  padding: 16rpx 20rpx;
+  font-size: 28rpx;
+  line-height: 1.4;
+}
+
+.ai-avatar-sm {
+  font-size: 32rpx;
+  margin-right: 8rpx;
+  flex-shrink: 0;
+}
+
+.card-bubble {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* 聊天输入 */
+.chat-input-area {
+  display: flex;
+  gap: 12rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid #eee;
+}
+
+.chat-input {
+  flex: 1;
+  padding: 16rpx 20rpx;
+  background: #f5f5f5;
+  border-radius: 36rpx;
+  font-size: 28rpx;
+}
+
+.send-btn {
+  padding: 16rpx 32rpx;
+  background: #07c160;
+  color: #fff;
+  border-radius: 36rpx;
+  font-size: 28rpx;
+  border: none;
+}
+
+/* 快捷聊天按钮 */
+.chat-quick-btns {
+  display: flex;
+  gap: 12rpx;
+  flex-wrap: wrap;
+  padding-top: 16rpx;
+}
+
+.quick-btn {
+  padding: 12rpx 24rpx;
+  background: #f0f0f0;
+  border-radius: 24rpx;
+  font-size: 24rpx;
+  color: #333;
+  border: none;
 }
 
 /* 目标选择弹窗 */

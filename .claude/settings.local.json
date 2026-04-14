@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm test:*)",
+      "Bash(node:*)",
+      "Bash(npx ts-node:*)",
+      "Bash(npx prisma:*)",
+      "Bash(npx vue-tsc:*)",
+      "Bash(grep:*)",
+      "Bash(lsof:*)",
+      "Bash(curl:*)",
+      "Bash(openssl rand:*)"
+    ]
+  }
+}

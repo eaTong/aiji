@@ -6,9 +6,12 @@ import { AuthContext } from '../types'
 
 export async function recommendTraining(ctx: Context) {
   const userId = (ctx as AuthContext).state.user.userId
-  const { forceRefresh = false } = ctx.request.body as { forceRefresh?: boolean }
+  const { forceRefresh = false, quickMode = false } = ctx.request.body as {
+    forceRefresh?: boolean
+    quickMode?: boolean
+  }
 
-  const result = await getTrainingRecommendation({ userId, forceRefresh })
+  const result = await getTrainingRecommendation({ userId, forceRefresh, quickMode })
   ctx.body = success(result)
 }
 

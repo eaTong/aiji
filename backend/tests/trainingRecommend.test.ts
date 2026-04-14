@@ -1,7 +1,7 @@
 import request from 'supertest'
 import jwt from 'jsonwebtoken'
 import app from '../src/app'
-import { prisma } from './setup'
+import { prisma, trackUser } from './setup'
 import { env } from '../src/config/env'
 import { seedExercises } from '../src/models/exerciseSeed'
 import { Goal, Equipment } from '@prisma/client'
@@ -9,6 +9,7 @@ import { calcE1RM } from '../src/services/trainingRecordService'
 
 async function makeAuthHeaders(extraOpenid = 'test_training_recommend') {
   const user = await prisma.user.create({ data: { openid: extraOpenid } })
+  trackUser(user.id)
   const token = jwt.sign({ userId: user.id }, env.jwtSecret)
   return { user, token }
 }

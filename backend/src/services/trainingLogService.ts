@@ -197,3 +197,58 @@ export async function getExerciseHistory(
     take: limit,
   })
 }
+
+/**
+ * Get personal record (PR) for an exercise
+ * Returns the entry with highest e1rm
+ */
+export async function getExercisePR(
+  userId: string,
+  exerciseId: string
+): Promise<{ entry: Prisma.LogEntryGetPayload<{}> | null; e1rm: number }> {
+  const entries = await prisma.logEntry.findMany({
+    where: { userId, exerciseId, isWarmup: false, e1rm: { not: null } },
+    orderBy: { e1rm: 'desc' },
+    take: 1,
+  })
+
+  if (entries.length === 0) {
+    return { entry: null, e1rm: 0 }
+  }
+
+  return { entry: entries[0], e1rm: entries[0].e1rm || 0 }
+}
+
+/**
+ * Get recent PRs across all exercises
+ */
+export async function getRecentPRs(
+  userId: string,
+  limit = 10
+): Promise<Array<{ exerciseId: string; exerciseName: string; e1rm: number; date: Date }>> {
+  // Get all PRs grouped by exercise
+  const entries = await prisma.logEntry.findMany({
+    where: { userId, isWarmup: false, e1rm: { not: null } },
+    orderBy: { completedAt: 'desc' },
+  })
+
+  // Group by exercise and get max e1rm
+  const prByExercise = new Map<string, { exerciseId: string; exerciseName: string; e1rm: number; date: Date }>()
+
+  for (const entry of entries) {
+    if (!entry.e1rm) continue
+    const existing = prByExercise.get(entry.exerciseId)
+    if (!existing || entry.e1rm > existing.e1rm) {
+      prByExercise.set(entry.exerciseId, {
+        exerciseId: entry.exerciseId,
+        exerciseName: entry.exerciseName,
+        e1rm: entry.e1rm,
+        date: entry.completedAt || new Date()
+      })
+    }
+  }
+
+  return Array.from(prByExercise.values())
+    .sort((a, b) => b.e1rm - a.e1rm)
+    .slice(0, limit)
+}

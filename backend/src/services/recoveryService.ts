@@ -176,7 +176,7 @@ export async function getRecoveryStatus(
   date: Date
 ): Promise<Prisma.RecoveryStatusGetPayload<{}> | null> {
   const dateStart = new Date(date)
-  dateStart.setHours(0, 0, 0, 0)
+  dateStart.setUTCHours(0, 0, 0, 0)
 
   const existing = await prisma.recoveryStatus.findUnique({
     where: { userId_date: { userId, date: dateStart } },
@@ -216,33 +216,40 @@ export async function updateSleep(
   sleepHours: number
 ): Promise<Prisma.RecoveryStatusGetPayload<{}>> {
   const dateStart = new Date(date)
-  dateStart.setHours(0, 0, 0, 0)
+  dateStart.setUTCHours(0, 0, 0, 0)
 
   // Compute muscle scores (from existing logs)
   const muscleScores = await computeMuscleScores(userId, dateStart)
   const score = computeOverallScore(muscleScores, sleepHours)
   const recommendation = computeRecommendation(score)
 
-  const result = await prisma.recoveryStatus.upsert({
+  const existing = await prisma.recoveryStatus.findUnique({
     where: { userId_date: { userId, date: dateStart } },
-    update: {
-      sleepHours,
-      score,
-      muscleStatus: muscleScores as unknown as Prisma.InputJsonValue,
-      recommendation,
-    },
-    create: {
-      userId,
-      date: dateStart,
-      sleepHours,
-      score,
-      muscleStatus: muscleScores as unknown as Prisma.InputJsonValue,
-      recommendation,
-      soreness: 0,
-      fatigue: 0,
-      sleepQuality: 0,
-    },
   })
+
+  const result = existing
+    ? await prisma.recoveryStatus.update({
+        where: { userId_date: { userId, date: dateStart } },
+        data: {
+          sleepHours,
+          score,
+          muscleStatus: muscleScores as unknown as Prisma.InputJsonValue,
+          recommendation,
+        },
+      })
+    : await prisma.recoveryStatus.create({
+        data: {
+          userId,
+          date: dateStart,
+          sleepHours,
+          score,
+          muscleStatus: muscleScores as unknown as Prisma.InputJsonValue,
+          recommendation,
+          soreness: 0,
+          fatigue: 0,
+          sleepQuality: 0,
+        },
+      })
 
   return result
 }

@@ -7,6 +7,7 @@ import trainingLogRouter from './trainingLog'
 import recoveryRouter from './recovery'
 import trainingPlanRouter from './trainingPlan'
 import trainingRouter from './training'
+import chatRouter from './chat'
 
 const router = new Router()
 router.use(authRouter.routes())
@@ -17,5 +18,6 @@ router.use(trainingLogRouter.routes())
 router.use(recoveryRouter.routes())
 router.use(trainingPlanRouter.routes())
 router.use(trainingRouter.routes())
+router.use(chatRouter.routes())
 
 export default router

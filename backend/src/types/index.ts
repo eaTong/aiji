@@ -19,3 +19,7 @@ export function success<T>(data: T, message = 'ok'): ApiResponse<T> {
 export function fail(message: string, code = 1): ApiResponse<null> {
   return { code, message, data: null }
 }
+
+// Re-export chat types
+export * from './chat'
+export * from './clarification'

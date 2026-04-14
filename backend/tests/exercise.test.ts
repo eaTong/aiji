@@ -1,12 +1,13 @@
 import request from 'supertest'
 import jwt from 'jsonwebtoken'
 import app from '../src/app'
-import { prisma } from './setup'
+import { prisma, trackUser } from './setup'
 import { env } from '../src/config/env'
 import { seedExercises } from '../src/models/exerciseSeed'
 
 async function makeAuthHeaders(extraOpenid = 'test_exercise') {
   const user = await prisma.user.create({ data: { openid: extraOpenid } })
+  trackUser(user.id)
   const token = jwt.sign({ userId: user.id }, env.jwtSecret)
   return { user, token }
 }
@@ -79,6 +80,7 @@ describe('GET /api/exercises/:id', () => {
   })
 
   it('should return exercise by id', async () => {
+    const { token } = await makeAuthHeaders('test_get_exercise_by_id')
     const exercises = await prisma.exercise.findMany({
       where: { isCustom: false, userId: null },
       take: 1,
@@ -86,13 +88,18 @@ describe('GET /api/exercises/:id', () => {
     const exerciseId = exercises[0]?.id
     if (!exerciseId) return
 
-    const res = await request(app.callback()).get(`/api/exercises/${exerciseId}`)
+    const res = await request(app.callback())
+      .get(`/api/exercises/${exerciseId}`)
+      .set('Authorization', `Bearer ${token}`)
     expect(res.status).toBe(200)
     expect(res.body.data.id).toBe(exerciseId)
   })
 
   it('should return 404 for non-existent exercise', async () => {
-    const res = await request(app.callback()).get('/api/exercises/non-existent-id')
+    const { token } = await makeAuthHeaders('test_get_exercise_404')
+    const res = await request(app.callback())
+      .get('/api/exercises/non-existent-id')
+      .set('Authorization', `Bearer ${token}`)
     expect(res.status).toBe(404)
   })
 })

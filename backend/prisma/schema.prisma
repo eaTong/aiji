@@ -30,6 +30,11 @@ model User {
   logEntries         LogEntry[]
   trainingLogs      TrainingLog[]
   workoutPlans       WorkoutPlan[]
+  chatMessages       ChatMessage[]
+  chatSessions       ChatSession[]
+  pushQueues         PushQueue[]
+  pushRecords        PushRecord[]
+  achievements       Achievement[]
 }
 
 model WeightRecord {
@@ -291,4 +296,99 @@ model ExerciseMuscle {
   muscle   Muscle   @relation(fields: [muscleId], references: [id])
 
   @@unique([exerciseId, muscleId])
+}
+
+// ============================================
+// Phase 3: AI Chat 相关模型
+// ============================================
+
+model ChatMessage {
+  id          String   @id @default(uuid())
+  userId      String
+  role        String   // "user" | "ai"
+  type        String   // "text" | "card"
+  cardType    String?  // card 时对应的 cardType
+  content     String?  // text 消息内容
+  cardData    Json?    // card 消息的 data 字段
+  actions     Json?    // card 消息的 actions 数组
+  planId      String?  // 关联的训练计划
+  sessionId   String? // 关联的会话 ID
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+  session     ChatSession? @relation(fields: [sessionId], references: [id])
+
+  @@index([userId, createdAt])
+}
+
+model ChatSession {
+  id          String   @id @default(uuid())
+  userId      String
+  status      SessionStatus @default(ACTIVE)
+  context     Json     // 存储追问上下文
+  pendingIntent String? // 待完成的意图
+  missingFields Json?  // 缺失的字段列表
+  clarificationHistory Json? // 追问历史
+  retryCount  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id])
+  messages    ChatMessage[]
+
+  @@index([userId, status])
+  @@index([userId, updatedAt])
+}
+
+enum SessionStatus {
+  ACTIVE              // 正常对话
+  AWAITING_CLARIFICATION  // 等待用户澄清
+  COMPLETED           // 已完成（已提取足够信息）
+  EXPIRED            // 已过期（超时或用户取消）
+}
+
+model PushQueue {
+  id          String   @id @default(uuid())
+  userId      String
+  cardType    String   // 推送的卡片类型
+  data        Json     // 卡片 data
+  actions     Json?    // 卡片 actions
+  triggerAt   DateTime // 触发时间
+  sentAt      DateTime? // 已发送时间（null=待发送）
+  expiresAt   DateTime // 过期时间
+  priority    Int      @default(0) // 优先级，数值越大优先级越高
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, sentAt, triggerAt])
+}
+
+model PushRecord {
+  id          String   @id @default(uuid())
+  userId      String
+  cardType    String
+  sentAt      DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, cardType, sentAt])
+}
+
+// ============================================
+// 成就系统
+// ============================================
+
+model Achievement {
+  id          String   @id @default(uuid())
+  userId      String
+  type        String   // 'first_training', 'week_streak', 'first_pr', etc.
+  name        String
+  description String?
+  icon        String?  // 成就图标
+  unlockedAt  DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, type])
 }
