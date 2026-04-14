@@ -4,6 +4,7 @@ import {
   addLogEntry,
   completeTraining,
   getTrainingLogs,
+  getTrainingLogById,
   getExerciseHistory,
 } from '../services/trainingLogService'
 import { success } from '../types'
@@ -58,6 +59,18 @@ export async function listTrainingLogs(ctx: Context) {
 
   const logs = await getTrainingLogs(userId, limit, offset)
   ctx.body = success(logs)
+}
+
+export async function getTrainingLogHandler(ctx: Context) {
+  const { logId } = ctx.params
+
+  const log = await getTrainingLogById(logId)
+  if (!log) {
+    ctx.status = 404
+    ctx.body = { code: 404, message: '训练记录不存在', data: null }
+    return
+  }
+  ctx.body = success(log)
 }
 
 export async function getExerciseHistoryHandler(ctx: Context) {

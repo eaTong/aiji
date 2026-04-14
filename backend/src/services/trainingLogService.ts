@@ -184,6 +184,21 @@ export async function getTrainingLogs(
 }
 
 /**
+ * Get a single training log with all entries
+ */
+export async function getTrainingLogById(logId: string): Promise<any> {
+  const log = await prisma.trainingLog.findUnique({
+    where: { id: logId },
+    include: {
+      logEntries: {
+        orderBy: { completedAt: 'asc' },
+      },
+    },
+  })
+  return log
+}
+
+/**
  * Get exercise personal history (last N records)
  */
 export async function getExerciseHistory(

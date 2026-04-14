@@ -61,6 +61,10 @@ export function getTrainingLogs(): Promise<TrainingLog[]> {
   return request<TrainingLog[]>('GET', '/api/training-logs')
 }
 
+export function getTrainingLog(logId: string): Promise<TrainingLog & { logEntries: TrainingLogEntry[] }> {
+  return request<TrainingLog & { logEntries: TrainingLogEntry[] }>('GET', `/api/training-logs/${logId}`)
+}
+
 export function getExerciseHistory(exerciseId: string): Promise<Array<{
   weight: number
   reps: number

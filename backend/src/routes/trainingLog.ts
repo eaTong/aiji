@@ -4,6 +4,7 @@ import {
   addEntry,
   finishTraining,
   listTrainingLogs,
+  getTrainingLogHandler,
   getExerciseHistoryHandler,
 } from '../controllers/trainingLogController'
 import { authMiddleware } from '../middleware/auth'
@@ -21,6 +22,9 @@ trainingLogRouter.post('/finish', authMiddleware, finishTraining)
 
 // GET /api/training-logs - list recent logs (paginated)
 trainingLogRouter.get('/', authMiddleware, listTrainingLogs)
+
+// GET /api/training-logs/:id - get a single log with entries
+trainingLogRouter.get('/:id', authMiddleware, getTrainingLogHandler)
 
 // GET /api/training-logs/exercise/:exerciseId/history - get exercise history
 trainingLogRouter.get(

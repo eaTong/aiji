@@ -467,7 +467,7 @@ function startOnboarding() {
 .container {
   min-height: 100vh;
   background-color: #f5f5f5;
-  padding: 20rpx;
+  padding: 0;
   padding-bottom: 120rpx;
   padding-top:100rpx;
 }

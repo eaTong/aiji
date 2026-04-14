@@ -67,7 +67,7 @@ function goLibrary() {
 }
 
 function goLogDetail(log: any) {
-  // TODO: Navigate to log detail page
+  uni.navigateTo({ url: `/pages/training/log-detail?id=${log.id}` })
 }
 
 function formatDate(dateStr: string): string {
