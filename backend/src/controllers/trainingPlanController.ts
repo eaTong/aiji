@@ -6,6 +6,8 @@ import {
   completePlan,
   archivePlan,
   deletePlan,
+  getReplacableExercises as getReplacableExercisesFromService,
+  replaceExercise as replaceExerciseFromService,
 } from '../services/trainingPlanService'
 import { success } from '../types'
 import { AuthContext } from '../types'
@@ -71,4 +73,39 @@ export async function removePlan(ctx: Context) {
   const { id } = ctx.params
   await deletePlan(id)
   ctx.body = success(null, 'Plan deleted')
+}
+
+/**
+ * 获取可替换的动作列表
+ * GET /api/training-plans/:planId/exercises/:exerciseId/replacable
+ */
+export async function getReplacableExercises(ctx: Context) {
+  const { exerciseId } = ctx.params
+  const result = await getReplacableExercisesFromService(exerciseId)
+  ctx.body = success(result)
+}
+
+/**
+ * 替换计划中的动作
+ * PUT /api/training-plans/:planId/exercises/:exerciseId/replace
+ */
+export async function replaceExercise(ctx: Context) {
+  const { exerciseId } = ctx.params
+  const { newExerciseId, reason } = ctx.request.body as {
+    newExerciseId: string
+    reason: string
+  }
+
+  if (!newExerciseId || !reason) {
+    ctx.status = 400
+    ctx.body = { code: 400, message: '缺少必填字段', data: null }
+    return
+  }
+
+  const result = await replaceExerciseFromService({
+    plannedExerciseId: exerciseId,
+    newExerciseId,
+    reason: reason as any,
+  })
+  ctx.body = success(result)
 }

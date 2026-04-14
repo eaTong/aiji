@@ -47,10 +47,12 @@
             v-for="ex in day.plannedExercises"
             :key="ex.id"
             class="exercise-item"
+            @click="openReplaceModal(ex)"
           >
             <text class="exercise-name">{{ ex.exerciseName }}</text>
             <text class="exercise-detail">{{ ex.targetSets }}组 × {{ ex.targetReps }}</text>
             <text v-if="ex.targetWeight" class="exercise-weight">{{ ex.targetWeight }}kg</text>
+            <text class="replace-hint">替换</text>
           </view>
         </view>
       </view>
@@ -60,6 +62,17 @@
     <view class="bottom-action">
       <button class="start-btn" @tap="startToday">开始今日训练</button>
     </view>
+
+    <!-- 替换动作弹窗 -->
+    <ExerciseReplaceModal
+      v-if="plan"
+      :visible="showReplaceModal"
+      :plan-id="plan.id"
+      :planned-exercise-id="currentReplaceExercise?.id ?? ''"
+      :current-exercise="currentReplaceExercise?.exercise"
+      @close="closeReplaceModal"
+      @replaced="onExerciseReplaced"
+    />
   </view>
 </template>
 
@@ -67,10 +80,15 @@
 import { ref, computed, onMounted } from 'vue'
 import { getTrainingPlan } from '../../api/trainingPlan'
 import type { PlanDetail, PlanDay, PlannedExercise } from '../../api/trainingPlan'
+import ExerciseReplaceModal from '../../components/training/ExerciseReplaceModal.vue'
 
 const plan = ref<PlanDetail | null>(null)
 const currentWeek = ref(1)
 const todayPlanDayId = ref<string | null>(null)
+
+// 替换动作弹窗状态
+const showReplaceModal = ref(false)
+const currentReplaceExercise = ref<PlannedExercise | null>(null)
 
 const goalMap: Record<string, string> = {
   GAIN_MUSCLE: '增肌',
@@ -133,6 +151,21 @@ function startToday() {
   })
 }
 
+function openReplaceModal(exercise: PlannedExercise) {
+  currentReplaceExercise.value = exercise
+  showReplaceModal.value = true
+}
+
+function closeReplaceModal() {
+  showReplaceModal.value = false
+  currentReplaceExercise.value = null
+}
+
+async function onExerciseReplaced() {
+  // 替换成功后刷新计划数据
+  await loadPlan()
+}
+
 async function loadPlan() {
   const pages = getCurrentPages()
   const currentPage = pages[pages.length - 1] as any
@@ -165,10 +198,6 @@ async function loadPlan() {
     console.error('Failed to load plan:', e)
     uni.showToast({ title: '加载失败', icon: 'none' })
   }
-}
-
-function getCurrentPages() {
-  return uni.getCurrentPages()
 }
 
 onMounted(() => {

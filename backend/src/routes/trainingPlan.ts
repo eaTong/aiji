@@ -6,6 +6,8 @@ import {
   markComplete,
   markArchive,
   removePlan,
+  getReplacableExercises,
+  replaceExercise,
 } from '../controllers/trainingPlanController'
 import { authMiddleware } from '../middleware/auth'
 
@@ -28,5 +30,11 @@ trainingPlanRouter.put('/:id/archive', authMiddleware, markArchive)
 
 // DELETE /api/training-plans/:id - delete plan
 trainingPlanRouter.delete('/:id', authMiddleware, removePlan)
+
+// GET /api/training-plans/:planId/exercises/:exerciseId/replacable - 获取可替换的动作列表
+trainingPlanRouter.get('/:planId/exercises/:exerciseId/replacable', authMiddleware, getReplacableExercises)
+
+// PUT /api/training-plans/:planId/exercises/:exerciseId/replace - 替换动作
+trainingPlanRouter.put('/:planId/exercises/:exerciseId/replace', authMiddleware, replaceExercise)
 
 export default trainingPlanRouter

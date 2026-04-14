@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
 
-**Goal:** 完成 Phase 2 剩余功能——训练计划 AI 生成、我的计划页面（含周视图）、围度记录页面补充各部位趋势图。
+**Goal:** 完成 Phase 2 剩余功能——训练计划 AI 生成、我的计划页面（含周视图）、围度记录页面补充各部位趋势图、用户引导问卷、动作替换。
+
+**更新时间：** 2026-04-14（补充引导问卷 + 动作替换）
 
 ---
 
@@ -13,11 +15,14 @@
 ```
 backend/src/
 ├── routes/
-│   └── trainingPlan.ts         # /api/training-plans/*
+│   ├── trainingPlan.ts         # /api/training-plans/*
+│   └── onboarding.ts           # /api/onboarding/* (引导问卷)
 ├── controllers/
-│   └── trainingPlanController.ts
+│   ├── trainingPlanController.ts
+│   └── onboardingController.ts
 ├── services/
-│   └── trainingPlanService.ts  # AI 计划生成 + CRUD
+│   ├── trainingPlanService.ts  # AI 计划生成 + CRUD + 替换
+│   └── onboardingService.ts   # 引导问卷业务逻辑
 ```
 
 ### 前端新增
@@ -26,8 +31,18 @@ backend/src/
 front/src/
 ├── pages/training/
 │   ├── plan-list.vue            # 我的计划列表
-│   ├── plan-detail.vue          # 计划详情（周视图）
+│   ├── plan-detail.vue          # 计划详情（周视图）+ 动作替换入口
 │   └── plan-generate.vue        # AI 生成计划页
+├── pages/onboarding/
+│   └── index.vue                # 引导问卷页（4 步）
+├── components/training/
+│   └── ExerciseReplaceModal.vue # 替换动作弹窗
+└── components/onboarding/       # 引导问卷子组件
+    ├── StepIndicator.vue
+    ├── StepGoal.vue
+    ├── StepStatus.vue
+    ├── StepBodyData.vue
+    └── StepDuration.vue
 ```
 
 ### 前端修改
@@ -227,11 +242,120 @@ PUT    /api/training-plans/:id/complete
 
 ---
 
+## Task 4: 用户引导问卷
+
+### 功能描述
+
+新用户首次打开小程序时，引导完成基本信息收集，然后自动生成个性化训练计划。
+
+### 问卷流程（4 步）
+
+| Step | 内容 | 说明 |
+|------|------|------|
+| Step 1 | 健身目标 | 增肌 / 减脂 / 塑形 / 提升体能 |
+| Step 2 | 当前状态 | 训练水平 + 器材 + 每周训练天数 |
+| Step 3 | 身体数据（可选） | 身高 / 体重 / 目标体重（可跳过） |
+| Step 4 | 健身时长 | 3个月以下 / 3-6个月 / 6-12个月 / 1年以上 |
+
+### API
+
+```
+POST /api/onboarding/complete   # 提交问卷，生成计划
+GET  /api/onboarding/status     # 获取引导状态
+```
+
+### 业务逻辑
+
+```typescript
+// 问卷提交后处理
+async function processOnboarding(userId: string, data: OnboardingData) {
+  // 1. 更新用户档案（goal, level, equipment, weeklyTrainingDays, fitnessDuration）
+  // 2. 记录体重（如提供）到 BodyData
+  // 3. 标记 hasCompletedOnboarding = true
+  // 4. 生成训练计划
+  return await generateTrainingPlan(userId)
+}
+```
+
+### 文件清单
+
+| 文件 | 状态 |
+|------|------|
+| `backend/prisma/schema.prisma` (User 新增字段) | ✅ |
+| `backend/src/routes/onboarding.ts` | ✅ |
+| `backend/src/controllers/onboardingController.ts` | ✅ |
+| `backend/src/services/onboardingService.ts` | ✅ |
+| `front/api/onboarding.ts` | ✅ |
+| `front/pages/onboarding/index.vue` | ✅ |
+| `front/components/onboarding/*.vue` (5个子组件) | ✅ |
+
+---
+
+## Task 5: 动作替换
+
+### 功能描述
+
+用户可在计划详情页点击动作卡片，选择替换原因（同类型动作列表），完成动作替换。
+
+### 交互流程
+
+```
+[计划详情页] → 点击动作卡片 → [替换弹窗]
+    ├── 选择替换原因：不感兴趣 / 没有器械 / 不会练 / 其他
+    ├── 选择替换动作：同类型动作列表
+    └── 确认替换 → 更新计划 + 记录历史
+```
+
+### API
+
+```
+GET  /api/training-plans/:planId/exercises/:exerciseId/replacable  # 获取可替换动作
+PUT  /api/training-plans/:planId/exercises/:exerciseId/replace      # 执行替换
+```
+
+### 数据模型
+
+```prisma
+model PlanExerciseReplacement {
+  id                  String   @id @default(uuid())
+  plannedExerciseId   String   // 被替换的计划动作 ID
+  originalExerciseId  String   // 原动作 ID
+  newExerciseId       String   // 新动作 ID
+  reason             String   // 替换原因
+  createdAt          DateTime @default(now())
+}
+```
+
+### 替换原因
+
+| 原因 | 值 | 图标 |
+|------|-----|------|
+| 不感兴趣 | not_interested | 😴 |
+| 没有器械 | no_equipment | 🏋️ |
+| 不会练 | dont_know_how | 🤔 |
+| 其他原因 | other | 📝 |
+
+### 文件清单
+
+| 文件 | 状态 |
+|------|------|
+| `backend/prisma/schema.prisma` (PlanExerciseReplacement) | ✅ |
+| `backend/src/services/trainingPlanService.ts` (替换逻辑) | ✅ |
+| `backend/src/controllers/trainingPlanController.ts` | ✅ |
+| `backend/src/routes/trainingPlan.ts` | ✅ |
+| `front/api/trainingPlan.ts` | ✅ |
+| `front/components/training/ExerciseReplaceModal.vue` | ✅ |
+| `front/pages/training/plan-detail.vue` (集成弹窗) | ✅ |
+
+---
+
 ## 自检清单
 
-| 规格要求 | 对应任务 |
-|---------|---------|
-| AI 生成训练计划 | Task 1 |
-| 我的计划（概览 + 周视图 + 历史归档）| Task 2 |
-| 围度 9 部位趋势图 | Task 3 |
-| 训练计划与训练日志关联（planId 传入）| Task 1, 2 |
+| 规格要求 | 对应任务 | 状态 |
+|---------|---------|------|
+| AI 生成训练计划 | Task 1 | ✅ |
+| 我的计划（概览 + 周视图 + 历史归档）| Task 2 | ✅ |
+| 围度 9 部位趋势图 | Task 3 | ✅ |
+| 用户引导问卷（4 步） | Task 4 | ✅ |
+| 动作替换（原因 + 列表） | Task 5 | ✅ |
+| 训练计划与训练日志关联（planId 传入）| Task 1, 2 | ✅ |

@@ -57,7 +57,9 @@
 
     <!-- 生成新计划按钮 -->
     <view class="bottom-action">
-      <button class="generate-btn" @tap="goGenerate">生成新计划</button>
+      <button class="generate-btn" @tap="goGenerate">
+        {{ hasCompletedOnboarding ? '生成新计划' : '完成初始化' }}
+      </button>
     </view>
   </view>
 </template>
@@ -66,11 +68,13 @@
 import { ref, computed, onMounted } from 'vue'
 import { getTrainingPlans } from '../../api/trainingPlan'
 import type { WorkoutPlan, PlanDay } from '../../api/trainingPlan'
+import { getOnboardingStatus } from '../../api/onboarding'
 
 const activePlan = ref<WorkoutPlan | null>(null)
 const allPlans = ref<WorkoutPlan[]>([])
 const planDaysMap = ref<Record<string, PlanDay[]>>({})
 const loading = ref(false)
+const hasCompletedOnboarding = ref(true)
 
 const goalMap: Record<string, string> = {
   GAIN_MUSCLE: '增肌',
@@ -164,19 +168,24 @@ function goPlanDetail(id: string) {
 }
 
 function goGenerate() {
-  uni.navigateTo({ url: '/pages/training/plan-generate' })
+  if (!hasCompletedOnboarding.value) {
+    uni.navigateTo({ url: '/pages/onboarding/index' })
+  } else {
+    uni.navigateTo({ url: '/pages/training/plan-generate' })
+  }
 }
 
 async function loadPlans() {
   loading.value = true
   try {
-    const plans = await getTrainingPlans()
+    // 并行加载计划和引导状态
+    const [plans, status] = await Promise.all([
+      getTrainingPlans(),
+      getOnboardingStatus().catch(() => ({ hasCompletedOnboarding: false })),
+    ])
     allPlans.value = plans
     activePlan.value = plans.find((p) => p.status === 'ACTIVE') ?? null
-
-    // For each plan, we would need to load its days. For now, we skip this
-    // since plan-days are loaded on detail page.
-    // In a real app, we might fetch a summary or cached days.
+    hasCompletedOnboarding.value = status.hasCompletedOnboarding
   } catch (e) {
     console.error('Failed to load plans:', e)
   } finally {

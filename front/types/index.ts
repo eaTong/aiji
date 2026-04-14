@@ -15,6 +15,28 @@ export interface User {
   equipment: 'GYM' | 'DUMBBELL' | 'BODYWEIGHT'
   weeklyTrainingDays: number
   currentPhase: 'CUT' | 'BULK' | 'MAINTAIN'
+  fitnessDuration?: 'LESS_THAN_3M' | 'THREE_TO_6M' | 'SIX_TO_12M' | 'OVER_1Y'
+  hasCompletedOnboarding: boolean
+}
+
+// 引导问卷数据结构
+export interface OnboardingData {
+  goal: 'LOSE_FAT' | 'GAIN_MUSCLE' | 'BODY_SHAPE' | 'IMPROVE_FITNESS'
+  level: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'
+  equipment: 'GYM' | 'DUMBBELL' | 'BODYWEIGHT'
+  weeklyTrainingDays: number
+  height?: number
+  currentWeight?: number
+  targetWeight?: number
+  fitnessDuration: 'LESS_THAN_3M' | 'THREE_TO_6M' | 'SIX_TO_12M' | 'OVER_1Y'
+}
+
+export interface OnboardingResult {
+  profileUpdated: boolean
+  weightRecorded: boolean
+  onboardingCompleted: boolean
+  planId?: string
+  planName?: string
 }
 
 export interface WeightRecord {

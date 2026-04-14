@@ -32,6 +32,9 @@ export const useChatStore = defineStore('chat', () => {
     entities: Record<string, any>
   } | null>(null)
 
+  // 正在处理的消息ID（用于禁用按钮）
+  const processingMessageId = ref<string | null>(null)
+
   // 初始化聊天（获取问候语和未读推送）
   async function initialize() {
     if (isInitialized.value) return
@@ -75,14 +78,51 @@ export const useChatStore = defineStore('chat', () => {
     if (!content.trim()) return null
 
     isLoading.value = true
+
+    // 创建临时的用户消息ID
+    const tempUserId = 'temp-user-' + Date.now()
+    const tempUserMessage: AIMessage = {
+      id: tempUserId,
+      userId: '',
+      role: 'user',
+      type: 'text',
+      content: content,
+      createdAt: new Date().toISOString() as any
+    }
+
+    // 创建"思考中"的 AI 消息
+    const tempAIId = 'temp-ai-' + Date.now()
+    const tempThinkingMessage: AIMessage = {
+      id: tempAIId,
+      userId: '',
+      role: 'ai',
+      type: 'thinking',
+      content: '',
+      createdAt: new Date().toISOString() as any
+    }
+
+    // 立即添加到列表显示
+    messages.value.push(tempUserMessage)
+    messages.value.push(tempThinkingMessage)
+
     try {
       const res = await chatApi.sendMessage(content, undefined, currentSessionId.value || undefined)
 
-      // 添加用户消息
-      messages.value.push(res.message)
+      // 替换临时用户消息（使用真实消息）
+      const userIndex = messages.value.findIndex(m => m.id === tempUserId)
+      if (userIndex !== -1) {
+        messages.value[userIndex] = res.message
+      }
 
-      // 添加 AI 消息
-      messages.value.push(res.aiMessage)
+      // 替换临时 AI 消息（使用真实响应）
+      const aiIndex = messages.value.findIndex(m => m.id === tempAIId)
+      if (aiIndex !== -1) {
+        messages.value[aiIndex] = res.aiMessage
+      } else {
+        // 如果没找到临时消息，说明请求失败了，移除思考中消息
+        messages.value = messages.value.filter(m => m.id !== tempAIId)
+        uni.showToast({ title: '发送失败，请重试', icon: 'none' })
+      }
 
       // 更新会话ID
       if (res.aiMessage.sessionId) {
@@ -103,6 +143,8 @@ export const useChatStore = defineStore('chat', () => {
       return res
     } catch (e) {
       console.error('发送消息失败', e)
+      // 移除临时消息
+      messages.value = messages.value.filter(m => m.id !== tempUserId && m.id !== tempAIId)
       uni.showToast({ title: '发送失败，请重试', icon: 'none' })
       return null
     } finally {
@@ -159,50 +201,54 @@ export const useChatStore = defineStore('chat', () => {
     const action = message.actions.find(a => a.id === actionId)
     if (!action) return
 
-    // 根据 action 类型处理
-    switch (action.action) {
-      case 'navigate':
-        // 跳转页面
-        if (action.target) {
-          uni.navigateTo({ url: action.target })
-        }
-        break
+    // 禁用按钮
+    processingMessageId.value = messageId
 
-      case 'dismiss':
-        // 关闭卡片 - 从消息列表移除
-        messages.value = messages.value.filter(m => m.id !== messageId)
-        break
+    try {
+      // 根据 action 类型处理
+      switch (action.action) {
+        case 'navigate':
+          // 跳转页面
+          if (action.target) {
+            uni.navigateTo({ url: action.target })
+          }
+          break
 
-      case 'confirm':
-        // 确认保存
-        await confirmAndSave(true)
-        break
+        case 'dismiss':
+          // 关闭卡片 - 从消息列表移除
+          messages.value = messages.value.filter(m => m.id !== messageId)
+          break
 
-      case 'cancel':
-        // 取消
-        await confirmAndSave(false)
-        break
+        case 'confirm':
+          // 确认保存
+          await confirmAndSave(true)
+          break
 
-      case 'regenerate':
-        // 重新生成 - 重新发送消息
-        if (message.content) {
-          await sendMessage(message.content)
-        }
-        // 移除旧卡片
-        messages.value = messages.value.filter(m => m.id !== messageId)
-        break
+        case 'cancel':
+          // 取消
+          await confirmAndSave(false)
+          break
 
-      case 'edit':
-        // 编辑 - 跳转到编辑页面
-        if (action.target) {
-          uni.navigateTo({ url: action.target })
-        }
-        break
+        case 'regenerate':
+          // 重新生成 - 重新发送消息
+          if (message.content) {
+            await sendMessage(message.content)
+          }
+          // 移除旧卡片
+          messages.value = messages.value.filter(m => m.id !== messageId)
+          break
 
-      case 'share':
-        // 分享
-        uni.showShareMenu({
-          withShareTicket: true
+        case 'edit':
+          // 编辑 - 跳转到编辑页面
+          if (action.target) {
+            uni.navigateTo({ url: action.target })
+          }
+          break
+
+        case 'share':
+          // 分享
+          uni.showShareMenu({
+            withShareTicket: true
         })
         break
 
@@ -216,6 +262,9 @@ export const useChatStore = defineStore('chat', () => {
 
       default:
         console.warn('未知 action 类型:', action.action)
+    }
+    } finally {
+      processingMessageId.value = null
     }
   }
 

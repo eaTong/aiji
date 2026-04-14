@@ -15,6 +15,24 @@ export async function createWeightRecord(userId: string, weight: number, recorde
   return prisma.weightRecord.create({ data: { userId, weight, recordedAt: date, note } })
 }
 
+// 记录今日体重（引导问卷专用，如果今日已有记录则更新）
+export async function recordWeightToday(userId: string, weight: number) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const existing = await prisma.weightRecord.findUnique({
+    where: { userId_recordedAt: { userId, recordedAt: today } },
+  })
+  if (existing) {
+    return prisma.weightRecord.update({
+      where: { id: existing.id },
+      data: { weight },
+    })
+  }
+  return prisma.weightRecord.create({
+    data: { userId, weight, recordedAt: today },
+  })
+}
+
 export async function getWeightRecords(userId: string, startDate: string, endDate: string) {
   const records = await prisma.weightRecord.findMany({
     where: {

@@ -29,8 +29,8 @@ export function request<T>(
           uni.navigateTo({ url: '/pages/profile/login' })
           reject(new Error('未授权'))
         } else {
-          uni.showToast({ title: body.message, icon: 'none' })
-          reject(new Error(body.message))
+          uni.showToast({ title: body.message || '请求失败', icon: 'none' })
+          reject(new Error(body.message || '请求失败'))
         }
       },
       fail(err) {

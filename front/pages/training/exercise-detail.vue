@@ -155,7 +155,7 @@ async function onToggleFavorite() {
 }
 
 onMounted(async () => {
-  const pages = uni.getCurrentPages()
+  const pages = getCurrentPages()
   const currentPage = pages[pages.length - 1]
   const options = (currentPage as any).options || {}
   exerciseId.value = options.id || ''

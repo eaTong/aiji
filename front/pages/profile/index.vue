@@ -26,6 +26,13 @@
       </view>
     </view>
 
+    <!-- 收藏动作入口 -->
+    <view class="menu-card" @tap="goFavorites">
+      <text class="menu-icon">⭐</text>
+      <text class="menu-label">收藏的动作</text>
+      <text class="menu-arrow">›</text>
+    </view>
+
     <button class="edit-btn" @tap="goEdit">编辑档案</button>
     <button class="logout-btn" @tap="userStore.logout()">退出登录</button>
   </view>
@@ -57,6 +64,10 @@ function goEdit() {
   uni.navigateTo({ url: '/pages/profile/edit' })
 }
 
+function goFavorites() {
+  uni.navigateTo({ url: '/pages/training/favorites' })
+}
+
 onMounted(() => userStore.fetchProfile())
 </script>
 
@@ -69,6 +80,10 @@ onMounted(() => userStore.fetchProfile())
 .info-row { display: flex; justify-content: space-between; padding: 28rpx 0; border-bottom: 1rpx solid #f0f0f0; }
 .info-label { font-size: 28rpx; color: #666; }
 .info-value { font-size: 28rpx; color: #333; }
+.menu-card { background: #fff; border-radius: 24rpx; padding: 32rpx; margin-bottom: 24rpx; display: flex; align-items: center; }
+.menu-icon { font-size: 40rpx; margin-right: 20rpx; }
+.menu-label { flex: 1; font-size: 30rpx; color: #333; }
+.menu-arrow { font-size: 40rpx; color: #ccc; }
 .edit-btn { background: #333; color: #fff; border-radius: 48rpx; margin-bottom: 24rpx; }
 .logout-btn { background: #fff; color: #999; border: 1rpx solid #eee; border-radius: 48rpx; }
 </style>

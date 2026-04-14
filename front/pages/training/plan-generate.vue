@@ -60,6 +60,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useUserStore } from '../../stores/user'
 import { generateTrainingPlan } from '../../api/trainingPlan'
+import { getOnboardingStatus } from '../../api/onboarding'
 
 const userStore = useUserStore()
 const user = computed(() => userStore.user)
@@ -104,6 +105,19 @@ async function generatePlan() {
 }
 
 onMounted(async () => {
+  // 检查是否已完成引导，未完成则跳转到引导页
+  try {
+    const status = await getOnboardingStatus()
+    if (!status.hasCompletedOnboarding) {
+      uni.redirectTo({ url: '/pages/onboarding/index' })
+      return
+    }
+  } catch (e) {
+    // 如果获取状态失败，也跳转到引导页
+    uni.redirectTo({ url: '/pages/onboarding/index' })
+    return
+  }
+
   if (!user.value) {
     await userStore.fetchProfile()
   }

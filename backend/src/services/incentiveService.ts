@@ -1,4 +1,5 @@
 import { PrismaClient, Achievement } from '@prisma/client'
+import { logger } from '../logger'
 
 const prisma = new PrismaClient()
 
@@ -384,7 +385,7 @@ async function unlockAchievement(
     }
   })
 
-  console.log(`[incentiveService] Achievement unlocked: ${type} for user ${userId}`)
+  logger.info(`[incentiveService] Achievement unlocked: ${type} for user ${userId}`)
 
   return achievement
 }

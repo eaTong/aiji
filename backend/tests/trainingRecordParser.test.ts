@@ -36,6 +36,21 @@ describe('trainingRecordParser', () => {
       const result2 = parseTrainingInput('深蹲 100kg 5个')
       expect(result2.exercises.length).toBe(1)
     })
+
+    it('should parse multiple exercises with groups and reps format', () => {
+      const result = parseTrainingInput('上斜杠铃卧推25公斤，5组8次，杠铃卧推30公斤，5组8次')
+      expect(result.exercises).toHaveLength(2)
+      // 上斜杠铃卧推
+      expect(result.exercises[0].name).toBe('上斜杠铃卧推')
+      expect(result.exercises[0].sets).toHaveLength(5)
+      expect(result.exercises[0].sets[0].weight).toBe(25)
+      expect(result.exercises[0].sets[0].reps).toBe(8)
+      // 杠铃卧推
+      expect(result.exercises[1].name).toBe('杠铃卧推')
+      expect(result.exercises[1].sets).toHaveLength(5)
+      expect(result.exercises[1].sets[0].weight).toBe(30)
+      expect(result.exercises[1].sets[0].reps).toBe(8)
+    })
   })
 
   describe('validateParsedData', () => {

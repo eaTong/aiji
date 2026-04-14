@@ -22,7 +22,12 @@ export interface ParsedTrainingData {
 }
 
 // 动作名称别名映射（用户输入 → 数据库动作名）
+// 顺序很重要：更具体的别名要放在前面优先匹配
 const EXERCISE_ALIASES: Record<string, string[]> = {
+  '上斜杠铃卧推': ['上斜杠铃卧推'],
+  '上斜哑铃卧推': ['上斜哑铃卧推'],
+  '上斜卧推': ['上斜杠铃卧推', '上斜哑铃卧推'],
+  '平板卧推': ['杠铃卧推', '哑铃卧推'],
   '卧推': ['杠铃卧推', '哑铃卧推'],
   '深蹲': ['杠铃深蹲', '哑铃深蹲'],
   '硬拉': ['杠铃硬拉'],
@@ -64,8 +69,12 @@ export function parseTrainingInput(message: string): ParsedTrainingData {
     result.date = 'dayBeforeYesterday'
   }
 
+  // 预处理：合并被逗号分隔的"重量"和"组次"信息
+  // 例如 "25公斤，5组8次" -> "25公斤5组8次"
+  const normalizedMessage = message.replace(/(\d+\.?\d*\s*(kg|公斤|斤|lbs|磅)?)\s*[,，]\s*(\d+组)/gi, '$1$3')
+
   // 按动作分割（逗号、顿号、分号）
-  const exerciseSegments = message.split(/[,，、；;]/)
+  const exerciseSegments = normalizedMessage.split(/[,，、；;]/)
 
   for (const segment of exerciseSegments) {
     const parsed = parseExerciseSegment(segment.trim())
@@ -90,11 +99,15 @@ function parseExerciseSegment(segment: string): ParsedExercise | null {
     // 尝试提取动作名
   }
 
-  // 提取动作名
+  // 提取动作名（优先匹配更长的别名）
   let exerciseName = ''
-  for (const [alias, targets] of Object.entries(EXERCISE_ALIASES)) {
+
+  // 按长度降序排序别名，确保先匹配更长的
+  const sortedAliases = Object.entries(EXERCISE_ALIASES).sort((a, b) => b[0].length - a[0].length)
+
+  for (const [alias, targets] of sortedAliases) {
     if (segment.includes(alias)) {
-      exerciseName = targets[0] // 使用第一个匹配的目标名称
+      exerciseName = targets[0]
       break
     }
   }
@@ -102,7 +115,8 @@ function parseExerciseSegment(segment: string): ParsedExercise | null {
   // 如果没有别名匹配，尝试直接匹配常见动作
   if (!exerciseName) {
     const commonExercises = [
-      '杠铃卧推', '哑铃卧推', '杠铃深蹲', '哑铃深蹲', '杠铃硬拉',
+      '上斜杠铃卧推', '上斜哑铃卧推', '杠铃卧推', '哑铃卧推',
+      '杠铃深蹲', '哑铃深蹲', '杠铃硬拉',
       '引体向上', '哑铃划船', '杠铃划船', '哑铃肩推', '平板支撑',
       '卷腹', '绳索下压', '哑铃弯举', '杠铃弯举'
     ]
@@ -117,23 +131,48 @@ function parseExerciseSegment(segment: string): ParsedExercise | null {
   // 提取重量和次数
   const sets: ParsedSet[] = []
 
-  // 匹配模式：重量 + 次数
-  // 例如：60kg 8个, 100kg 5次, 80lbs 10reps
-  const setPattern = /(\d+\.?\d*)\s*(kg|公斤|斤|lbs|磅)?\s*[,，]?\s*(\d+)\s*(个|次|rep|reps)?/gi
+  // 匹配模式1：重量 + 组 + 次数 (如 "25公斤5组8次")
+  const setPattern1 = /(\d+\.?\d*)\s*(kg|公斤|斤|lbs|磅)?\s*(\d+)\s*组\s*(\d+)\s*(个|次|rep|reps)?/gi
+  // 匹配模式2：重量 + 次数 (如 "60kg 8个")
+  const setPattern2 = /(\d+\.?\d*)\s*(kg|公斤|斤|lbs|磅)?\s*[,，]?\s*(\d+)\s*(个|次|rep|reps)?/gi
 
   let match
-  while ((match = setPattern.exec(segment)) !== null) {
+
+  // 首先尝试匹配 "重量 + 组 + 次数" 格式
+  while ((match = setPattern1.exec(segment)) !== null) {
     const weight = parseFloat(match[1])
     const unit = (match[2] || 'kg').toLowerCase()
-    const reps = parseInt(match[3])
+    const groupCount = parseInt(match[3])
+    const reps = parseInt(match[4])
 
-    if (!isNaN(weight) && !isNaN(reps) && weight > 0 && reps > 0) {
+    if (!isNaN(weight) && !isNaN(reps) && weight > 0 && reps > 0 && groupCount > 0) {
       // 转换为 kg
       const weightInKg = weight * (WEIGHT_UNITS[unit] || 1)
-      sets.push({
-        weight: Math.round(weightInKg * 10) / 10, // 保留1位小数
-        reps
-      })
+      // 添加多组
+      for (let i = 0; i < groupCount; i++) {
+        sets.push({
+          weight: Math.round(weightInKg * 10) / 10,
+          reps
+        })
+      }
+    }
+  }
+
+  // 如果没有匹配到组格式，尝试标准 "重量 + 次数" 格式
+  if (sets.length === 0) {
+    while ((match = setPattern2.exec(segment)) !== null) {
+      const weight = parseFloat(match[1])
+      const unit = (match[2] || 'kg').toLowerCase()
+      const reps = parseInt(match[3])
+
+      if (!isNaN(weight) && !isNaN(reps) && weight > 0 && reps > 0) {
+        // 转换为 kg
+        const weightInKg = weight * (WEIGHT_UNITS[unit] || 1)
+        sets.push({
+          weight: Math.round(weightInKg * 10) / 10, // 保留1位小数
+          reps
+        })
+      }
     }
   }
 

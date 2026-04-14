@@ -168,15 +168,15 @@ function draw() {
   // 清空画布
   ctx.clearRect(0, 0, canvasWidth, canvasHeight)
 
-  // 绘制头部（椭圆）
+  // 绘制头部（用圆形代替椭圆，微信小程序不支持 ellipse）
   ctx.beginPath()
-  ctx.ellipse(100, 30, 18, 22, 0, 0, 2 * Math.PI)
+  ctx.arc(100, 30, 18, 0, 2 * Math.PI)
   ctx.setFillStyle('#ccc')
   ctx.fill()
 
-  // 绘制颈部
+  // 绘制颈部（用矩形）
   ctx.beginPath()
-  ctx.rect(92, 50, 16, 12)
+  ctx.rect(92, 48, 16, 14)
   ctx.setFillStyle('#ccc')
   ctx.fill()
 

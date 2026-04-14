@@ -1,5 +1,6 @@
 import * as pushService from '../services/pushService'
 import * as sessionManager from '../services/sessionManager'
+import { logger } from '../logger'
 
 // ============================================
 // 定时任务 - 推送检查与清理
@@ -12,7 +13,7 @@ let isRunning = false
  */
 export async function runScheduledTasks(): Promise<void> {
   if (isRunning) {
-    console.log('[PushChecker] Task already running, skipping...')
+    logger.warn('[PushChecker] Task already running, skipping...')
     return
   }
 
@@ -20,23 +21,23 @@ export async function runScheduledTasks(): Promise<void> {
   const startTime = Date.now()
 
   try {
-    console.log('[PushChecker] Running scheduled tasks...')
+    logger.info('[PushChecker] Running scheduled tasks...')
 
     // 1. 检查定时推送
     await pushService.checkScheduledPushes()
-    console.log('[PushChecker] Scheduled pushes checked')
+    logger.info('[PushChecker] Scheduled pushes checked')
 
     // 2. 清理过期推送
     await pushService.cleanupExpiredPushes()
-    console.log('[PushChecker] Expired pushes cleaned')
+    logger.info('[PushChecker] Expired pushes cleaned')
 
     // 3. 清理过期 Session
     await sessionManager.cleanupExpiredSessions()
-    console.log('[PushChecker] Expired sessions cleaned')
+    logger.info('[PushChecker] Expired sessions cleaned')
 
-    console.log(`[PushChecker] All tasks completed in ${Date.now() - startTime}ms`)
+    logger.info(`[PushChecker] All tasks completed in ${Date.now() - startTime}ms`)
   } catch (error) {
-    console.error('[PushChecker] Error running tasks:', error)
+    logger.error('[PushChecker] Error running tasks:', { error: String(error) })
   } finally {
     isRunning = false
   }
@@ -52,7 +53,7 @@ export function startPushChecker(): NodeJS.Timeout {
   // 每分钟执行
   const interval = setInterval(runScheduledTasks, 60 * 1000)
 
-  console.log('[PushChecker] Push checker started (every 60 seconds)')
+  logger.info('[PushChecker] Push checker started (every 60 seconds)')
 
   return interval
 }
@@ -62,5 +63,5 @@ export function startPushChecker(): NodeJS.Timeout {
  */
 export function stopPushChecker(interval: NodeJS.Timeout): void {
   clearInterval(interval)
-  console.log('[PushChecker] Push checker stopped')
+  logger.info('[PushChecker] Push checker stopped')
 }

@@ -28,13 +28,7 @@ export interface PlannedExercise {
   targetReps: string // "8-12"
   targetWeight?: number
   orderIndex: number
-}
-
-export interface Exercise {
-  id: string
-  name: string
-  category: string
-  primaryMuscles: string[]
+  exercise?: Exercise // 包含完整动作信息
 }
 
 export interface PlanDetail extends WorkoutPlan {
@@ -67,4 +61,45 @@ export function archiveTrainingPlan(id: string): Promise<WorkoutPlan> {
 
 export function deleteTrainingPlan(id: string): Promise<void> {
   return request<void>('DELETE', `/api/training-plans/${id}`)
+}
+
+// 替换动作相关类型
+export type ReplacementReason = 'not_interested' | 'no_equipment' | 'dont_know_how' | 'other'
+
+export interface ReplaceExerciseParams {
+  newExerciseId: string
+  reason: ReplacementReason
+}
+
+export interface ReplaceableExercisesResult {
+  currentExercise: Exercise
+  replacableExercises: Exercise[]
+}
+
+/**
+ * 获取可替换的动作列表
+ */
+export function getReplacableExercises(
+  planId: string,
+  plannedExerciseId: string
+): Promise<ReplaceableExercisesResult> {
+  return request<ReplaceableExercisesResult>(
+    'GET',
+    `/api/training-plans/${planId}/exercises/${plannedExerciseId}/replacable`
+  )
+}
+
+/**
+ * 替换计划中的动作
+ */
+export function replaceExercise(
+  planId: string,
+  plannedExerciseId: string,
+  params: ReplaceExerciseParams
+): Promise<any> {
+  return request<any>(
+    'PUT',
+    `/api/training-plans/${planId}/exercises/${plannedExerciseId}/replace`,
+    params as unknown as Record<string, unknown>
+  )
 }

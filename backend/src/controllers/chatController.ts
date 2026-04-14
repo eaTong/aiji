@@ -1,6 +1,7 @@
 import { Context } from 'koa'
 import { success, fail, AuthContext } from '../types'
 import * as chatService from '../services/chatService'
+import { createAIMessage } from '../services/chatService'
 import * as aiChatService from '../services/aiChatService'
 import * as aiGatewayService from '../services/aiGatewayService'
 import * as pushService from '../services/pushService'
@@ -60,45 +61,42 @@ export async function sendMessage(ctx: Context) {
   // 1. 保存用户消息
   const userMessage = await chatService.sendMessage(userId, content, planId, sessionId)
 
-  // 2. 处理追问流程（优先）
-  const clarificationResult = await clarificationService.processMessage(userId, content)
-
-  // 如果需要回复（追问）
-  if (clarificationResult.shouldRespond && clarificationResult.response) {
-    ctx.body = success({
-      message: userMessage,
-      aiMessage: clarificationResult.response.message,
-      sessionId: clarificationResult.response.sessionId
-    })
-    return
-  }
-
-  // 如果流程完成，生成 AI 回复
-  if (clarificationResult.completed && clarificationResult.cardData) {
-    // 生成对应的卡片回复
-    const aiMessage = await aiChatService.chat(
-      userId,
-      content,
-      clarificationResult.cardData
-    )
-
-    ctx.body = success({
-      message: userMessage,
-      aiMessage,
-      sessionId: clarificationResult.cardData.sessionId
-    })
-    return
-  }
-
-  // 3. 使用 AI 判断意图（新增流程）
+  // 2. 使用 AI 判断意图
   const { intent, confidence } = await aiGatewayService.determineIntent(userId, content)
 
-  // 4. 如果是记录型意图，先解析实体并发送确认卡片
+  // 3. 检查是否是 RECORD 类型意图（优先处理，跳过 clarificationService）
   const recordIntents = ['RECORD_WEIGHT', 'RECORD_TRAINING', 'RECORD_MEASUREMENT', 'RECORD_DIET']
+
+  // 4. 如果是 RECORD 型意图且置信度足够，解析实体并检查是否可以直接保存
   if (recordIntents.includes(intent) && confidence > 0.6) {
     const entities = await aiGatewayService.parseEntities(userId, content, intent)
 
-    // 生成带确认的卡片（用于用户确认后保存）
+    // 检查实体数据是否完整，可以直接保存
+    const canDirectSave = await checkCanDirectSave(intent, entities)
+    if (canDirectSave) {
+      // 直接保存
+      await chatConfirmationService.confirmAndSave(
+        userId,
+        'direct-save',
+        getCardType(intent),
+        entities,
+        true
+      )
+
+      // 生成简洁的确认消息，不再次保存
+      const aiMessage = await generateDirectSaveConfirmation(userId, intent, entities)
+
+      ctx.body = success({
+        message: userMessage,
+        aiMessage,
+        intent,
+        entities,
+        directSave: true
+      })
+      return
+    }
+
+    // 数据不完整，生成带确认的卡片
     const aiMessage = await aiChatService.chat(userId, content, {
       intent,
       entities,
@@ -240,4 +238,157 @@ export async function pauseSession(ctx: Context) {
   }
 
   ctx.body = success(null)
+}
+
+// ============================================
+// 辅助函数
+// ============================================
+
+/**
+ * 检查是否可以直接保存（数据完整）
+ */
+async function checkCanDirectSave(intent: string, entities: Record<string, any>): Promise<boolean> {
+  switch (intent) {
+    case 'RECORD_WEIGHT':
+      // 体重记录：需要有效的体重值
+      return entities.weight !== undefined && entities.weight !== null && entities.weight > 0
+
+    case 'RECORD_TRAINING':
+      // 训练记录：需要至少一个动作
+      return entities.exercises !== undefined && entities.exercises.length > 0
+
+    case 'RECORD_MEASUREMENT':
+      // 围度记录：需要至少一个围度数据
+      return entities.measurements !== undefined && Object.keys(entities.measurements).length > 0
+
+    case 'RECORD_DIET':
+      // 饮食记录：需要热量或餐食数据
+      return (entities.calories !== undefined && entities.calories > 0) ||
+             (entities.meals !== undefined && entities.meals.length > 0)
+
+    default:
+      return false
+  }
+}
+
+/**
+ * 获取卡片类型
+ */
+function getCardType(intent: string): string {
+  switch (intent) {
+    case 'RECORD_WEIGHT':
+      return 'weight-record'
+    case 'RECORD_TRAINING':
+      return 'training-editable'
+    case 'RECORD_MEASUREMENT':
+      return 'measurement-record'
+    case 'RECORD_DIET':
+      return 'diet-record'
+    default:
+      return ''
+  }
+}
+
+// ============================================
+// 直接保存确认消息生成
+// ============================================
+
+/**
+ * 生成直接保存后的确认消息（简洁的"已记录"提示）
+ */
+async function generateDirectSaveConfirmation(
+  userId: string,
+  intent: string,
+  entities: Record<string, any>
+): Promise<any> {
+  switch (intent) {
+    case 'RECORD_WEIGHT': {
+      const { weight, unit } = entities
+      return await createAIMessage(userId, {
+        type: 'card',
+        cardType: 'weight-record',
+        cardData: {
+          weight: weight,
+          unit: unit || 'kg',
+          date: new Date().toISOString().split('T')[0],
+          saved: true,
+          directSave: true
+        },
+        actions: [
+          { id: 'undo', label: '撤销', action: 'cancel' },
+          { id: 'dismiss', label: '知道了', action: 'dismiss' }
+        ]
+      })
+    }
+
+    case 'RECORD_TRAINING': {
+      const { exercises } = entities
+      const count = exercises?.length || 0
+      const totalSets = exercises?.reduce((sum: number, e: any) => sum + (e.sets?.length || 0), 0) || 0
+      return await createAIMessage(userId, {
+        type: 'card',
+        cardType: 'training-editable',
+        cardData: {
+          date: new Date().toISOString().split('T')[0],
+          exercises: exercises || [],
+          saved: true,
+          directSave: true,
+          summary: `已记录 ${count} 个动作，共 ${totalSets} 组`
+        },
+        actions: [
+          { id: 'undo', label: '撤销', action: 'cancel' },
+          { id: 'dismiss', label: '知道了', action: 'dismiss' }
+        ]
+      })
+    }
+
+    case 'RECORD_MEASUREMENT': {
+      const { measurements } = entities
+      const count = measurements ? Object.keys(measurements).length : 0
+      return await createAIMessage(userId, {
+        type: 'card',
+        cardType: 'measurement-record',
+        cardData: {
+          date: new Date().toISOString().split('T')[0],
+          measurements: measurements || {},
+          saved: true,
+          directSave: true,
+          summary: `已记录 ${count} 项围度`
+        },
+        actions: [
+          { id: 'undo', label: '撤销', action: 'cancel' },
+          { id: 'dismiss', label: '知道了', action: 'dismiss' }
+        ]
+      })
+    }
+
+    case 'RECORD_DIET': {
+      const { calories, meals } = entities
+      return await createAIMessage(userId, {
+        type: 'card',
+        cardType: 'diet-record',
+        cardData: {
+          date: new Date().toISOString().split('T')[0],
+          calories: calories || 0,
+          meals: meals || [],
+          saved: true,
+          directSave: true,
+          summary: '饮食记录已保存'
+        },
+        actions: [
+          { id: 'undo', label: '撤销', action: 'cancel' },
+          { id: 'dismiss', label: '知道了', action: 'dismiss' }
+        ]
+      })
+    }
+
+    default:
+      return await createAIMessage(userId, {
+        type: 'text',
+        content: '已记录',
+        actions: [
+          { id: 'dismiss', label: '知道了', action: 'dismiss' }
+        ]
+      })
+  }
 }

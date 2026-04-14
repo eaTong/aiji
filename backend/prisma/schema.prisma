@@ -19,6 +19,8 @@ model User {
   equipment         Equipment @default(GYM)
   weeklyTrainingDays Int      @default(3)
   currentPhase      Phase     @default(MAINTAIN)
+  fitnessDuration   FitnessDuration?
+  hasCompletedOnboarding Boolean @default(false)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -103,6 +105,13 @@ enum Phase {
   CUT
   BULK
   MAINTAIN
+}
+
+enum FitnessDuration {
+  LESS_THAN_3M    // 3个月以下
+  THREE_TO_6M     // 3-6个月
+  SIX_TO_12M      // 6-12个月
+  OVER_1Y         // 1年以上
 }
 
 enum PhotoAngle {
@@ -194,8 +203,25 @@ model PlannedExercise {
   order       Int      @default(0)
   createdAt   DateTime @default(now())
 
-  planDay  PlanDay     @relation(fields: [planDayId], references: [id], onDelete: Cascade)
-  exercise Exercise    @relation(fields: [exerciseId], references: [id])
+  planDay      PlanDay                    @relation(fields: [planDayId], references: [id], onDelete: Cascade)
+  exercise     Exercise                   @relation(fields: [exerciseId], references: [id])
+  replacements PlanExerciseReplacement[]
+}
+
+// 动作替换记录
+model PlanExerciseReplacement {
+  id                  String   @id @default(uuid())
+  plannedExerciseId   String
+  originalExerciseId  String
+  newExerciseId       String
+  reason             String   // 替换原因: not_interested | no_equipment | dont_know_how | other
+  createdAt          DateTime @default(now())
+
+  plannedExercise   PlannedExercise   @relation(fields: [plannedExerciseId], references: [id], onDelete: Cascade)
+  originalExercise  Exercise          @relation("OriginalExercise", fields: [originalExerciseId], references: [id])
+  newExercise       Exercise          @relation("NewExercise", fields: [newExerciseId], references: [id])
+
+  @@index([plannedExerciseId])
 }
 
 enum PlanStatus {
@@ -239,10 +265,12 @@ model Exercise {
   userId        String?
   createdAt     DateTime  @default(now())
 
-  user             User?           @relation(fields: [userId], references: [id])
-  logEntries       LogEntry[]
-  plannedExercises PlannedExercise[]
-  exerciseMuscles  ExerciseMuscle[]
+  user                  User?                     @relation(fields: [userId], references: [id])
+  logEntries            LogEntry[]
+  plannedExercises       PlannedExercise[]
+  exerciseMuscles       ExerciseMuscle[]
+  originalReplacements   PlanExerciseReplacement[] @relation("OriginalExercise")
+  newReplacements        PlanExerciseReplacement[] @relation("NewExercise")
 }
 
 enum ExerciseCategory {
@@ -308,7 +336,7 @@ model ChatMessage {
   role        String   // "user" | "ai"
   type        String   // "text" | "card"
   cardType    String?  // card 时对应的 cardType
-  content     String?  // text 消息内容
+  content     String?  @db.Text  // text 消息内容
   cardData    Json?    // card 消息的 data 字段
   actions     Json?    // card 消息的 actions 数组
   planId      String?  // 关联的训练计划

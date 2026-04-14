@@ -95,7 +95,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, getCurrentInstance } from 'vue'
 import ExerciseCard from '../../components/training/ExerciseCard.vue'
 import SetInput from '../../components/training/SetInput.vue'
 import RestTimer from '../../components/training/RestTimer.vue'

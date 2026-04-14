@@ -33,3 +33,7 @@ export function getExerciseById(id: string): Promise<Exercise> {
 export function toggleFavorite(id: string): Promise<Exercise> {
   return request<Exercise>('POST', `/api/exercises/${id}/favorite`)
 }
+
+export function getFavoriteExercises(): Promise<Exercise[]> {
+  return request<Exercise[]>('GET', '/api/exercises?favorites=true')
+}

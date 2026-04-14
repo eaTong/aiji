@@ -137,15 +137,6 @@
     </view>
 
     <!-- AI 对话区域 -->
-    <view class="chat-area">
-      <!-- 消息列表（包含问候语和所有消息） -->
-      <scroll-view
-        ref="chatAreaRef"
-        class="chat-messages"
-        scroll-y
-        :scroll-top="chatScrollTop"
-      >
-        <!-- 问候语卡片 -->
         <view v-if="chatStore.greeting" class="greeting-card">
           <view class="card-header">
             <text class="ai-avatar">🤖</text>
@@ -215,8 +206,6 @@
             </view>
           </view>
         </view>
-      </scroll-view>
-    </view>
 
     <!-- 固定在底部的聊天输入框 -->
     <view class="fixed-chat-input">
@@ -480,18 +469,20 @@ function startOnboarding() {
   background-color: #f5f5f5;
   padding: 20rpx;
   padding-bottom: 120rpx;
-  display: flex;
-  flex-direction: column;
+  padding-top:100rpx;
 }
 
 /* 快捷操作栏 */
 .quick-actions {
-  display: flex;
+  display: flex-box;
   justify-content: space-between;
   padding: 20rpx;
   background: #fff;
   border-radius: 16rpx;
   margin-bottom: 20rpx;
+  position: fixed;
+  top: 0;
+  width:100vw;
 }
 
 .action-btn {

@@ -80,7 +80,8 @@ function statusLabel(s: string): string {
 
 async function loadRecovery() {
   try {
-    const status = await getRecovery()
+    const today = new Date().toISOString().slice(0, 10)
+    const status = await getRecovery(today)
     recoveryScore.value = status.score
     recommendation.value = status.recommendation
     sleepHours.value = status.sleepHours
