@@ -2,7 +2,7 @@
 .env
 .env.local
 .env.*.local
-
+.env.test
 # 依赖
 node_modules/
 
