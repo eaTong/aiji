@@ -164,26 +164,252 @@ npm run test:coverage    # 生成覆盖率报告
 
 ## 数据库
 
-### 主要数据模型
+### 环境要求
 
-- **User** - 用户档案（目标/器材/等级）
-- **WeightRecord** - 体重记录
-- **MeasurementRecord** - 围度记录
-- **Exercise** - 动作库
-- **TrainingLog/LogEntry** - 训练记录
-- **RecoveryStatus** - 肌群恢复状态
-- **WorkoutPlan/PlanDay** - 训练计划
-- **ChatMessage** - 聊天消息
-- **ChatSession** - 会话管理
-- **PushQueue** - 推送队列
+- **MySQL**: >= 8.0
+- **数据库名称**: `aiji` (可在 .env 中配置)
 
-### Prisma 命令
+### 1. MySQL 安装与配置
+
+**macOS (使用 Homebrew)**
 
 ```bash
-npm run prisma:generate   # 生成 Prisma Client
-npm run prisma:migrate   # 执行数据库迁移
-npm run prisma:studio    # 打开可视化数据库管理
-npm run prisma:migrate:reset  # 重置数据库
+brew install mysql
+brew services start mysql
+mysql_secure_installation
+```
+
+**Ubuntu/Debian**
+
+```bash
+sudo apt update
+sudo apt install mysql-server
+sudo systemctl start mysql
+sudo mysql_secure_installation
+```
+
+**Windows**
+
+下载 MySQL Installer: https://dev.mysql.com/downloads/installer/
+
+### 2. 创建数据库
+
+```bash
+# 登录 MySQL
+mysql -u root -p
+
+# 创建数据库
+CREATE DATABASE aiji CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+# 验证
+SHOW DATABASES;
+```
+
+### 3. 数据库配置
+
+在 `backend/.env` 中配置数据库连接：
+
+```env
+DATABASE_URL="mysql://user:password@localhost:3306/aiji"
+```
+
+格式说明：
+```
+mysql://用户名:密码@主机地址:端口号/数据库名
+```
+
+### 4. Prisma 数据模型
+
+#### 核心模型
+
+| 模型 | 说明 | 主要字段 |
+|------|------|----------|
+| **User** | 用户档案 | openid, nickname, goal, level, equipment |
+| **WeightRecord** | 体重记录 | userId, weight, recordedAt |
+| **MeasurementRecord** | 围度记录 | userId, chest, waist, hip, arms, thighs |
+| **Exercise** | 动作库 | name, muscle, equipment, difficulty |
+| **TrainingLog** | 训练日志 | userId, date, notes |
+| **LogEntry** | 训练动作明细 | exerciseId, sets, reps, weight |
+| **RecoveryStatus** | 肌群恢复状态 | userId, muscle, score |
+| **WorkoutPlan** | 训练计划 | userId, name, startDate |
+| **PlanDay** | 计划日 | planId, dayOfWeek, trainingType |
+| **ChatMessage** | 聊天消息 | userId, role, type, content |
+| **ChatSession** | 会话 | userId, status, context |
+| **PushQueue** | 推送队列 | userId, type, isRead |
+| **Achievement** | 成就 | userId, type, unlockedAt |
+
+#### 枚举类型
+
+```prisma
+// 用户目标
+enum Goal {
+  LOSE_FAT      // 减脂
+  GAIN_MUSCLE   // 增肌
+  BODY_SHAPE    // 塑形
+  IMPROVE_FITNESS // 提升体能
+}
+
+// 用户等级
+enum Level {
+  BEGINNER      // 初学者
+  INTERMEDIATE  // 中级
+  ADVANCED      // 高级
+}
+
+// 器材类型
+enum Equipment {
+  GYM          // 健身房
+  DUMBBELL     // 哑铃
+  BODYWEIGHT   // 自重
+}
+
+// 训练类型
+enum TrainingType {
+  PUSH         // 推
+  PULL         // 拉
+  LEGS         // 腿
+  UPPER        // 上身
+  LOWER        // 下身
+  FULL_BODY    // 全身
+}
+
+// 阶段
+enum Phase {
+  MAINTAIN     // 维持
+  CUT          // 减脂期
+  BULK         // 增肌期
+}
+```
+
+### 5. Prisma 工作流程
+
+#### 初始化新项目
+
+```bash
+cd backend
+
+# 1. 安装依赖
+npm install
+
+# 2. 配置环境变量
+cp .env.example .env
+# 编辑 .env 中的 DATABASE_URL
+
+# 3. 生成 Prisma Client
+npm run prisma:generate
+
+# 4. 创建数据库迁移
+npm run prisma:migrate
+
+# 5. （可选）填充种子数据
+npm run db:seed
+```
+
+#### 日常开发
+
+```bash
+# 启动开发服务器（自动处理迁移）
+npm run dev
+
+# 或分步操作
+npm run prisma:generate   # 同步 schema 变更
+npm run prisma:migrate     # 执行迁移
+npm run db:seed           # 填充测试数据
+npm run db:studio         # 打开 Prisma Studio 可视化管理
+```
+
+#### 修改数据模型
+
+```bash
+# 1. 编辑 prisma/schema.prisma
+
+# 2. 创建迁移
+npm run prisma:migrate -- --name 描述迁移名称
+
+# 3. 推送变更到数据库（开发环境）
+npx prisma db push
+
+# 4. 重新生成 Client
+npm run prisma:generate
+```
+
+#### 重置数据库
+
+```bash
+# 重置迁移（会删除所有数据）
+npm run prisma:migrate:reset
+
+# 仅删除并重建
+npx prisma migrate drop
+npm run prisma:migrate
+```
+
+### 6. Prisma 命令参考
+
+| 命令 | 说明 |
+|------|------|
+| `npm run prisma:generate` | 生成 Prisma Client |
+| `npm run prisma:migrate` | 执行数据库迁移 |
+| `npm run prisma:migrate -- --name xxx` | 创建新迁移 |
+| `npm run prisma:migrate:reset` | 重置数据库 |
+| `npm run prisma:migrate:dev` | 开发模式迁移（创建迁移 + 执行） |
+| `npx prisma db push` | 推送 schema 到数据库（不创建迁移文件） |
+| `npx prisma db pull` | 从数据库拉取 schema |
+| `npm run db:seed` | 填充种子数据 |
+| `npm run db:studio` | 打开 Prisma Studio |
+| `npx prisma db execute` | 执行 SQL |
+
+### 7. Prisma Studio 可视化
+
+启动 Prisma Studio 查看和管理数据库数据：
+
+```bash
+npm run db:studio
+```
+
+浏览器访问 http://localhost:5555
+
+### 8. 常见问题
+
+**Q: 迁移失败怎么办？**
+
+```bash
+# 查看迁移状态
+npx prisma migrate status
+
+# 重置到指定迁移
+npx prisma migrate resolve --rolled-back "20240101000000_init"
+```
+
+**Q: 如何查看生成的 SQL？**
+
+```bash
+npx prisma migrate diff --from-empty --to-schema-datamodel
+```
+
+**Q: 如何在代码中使用 Prisma Client？**
+
+```typescript
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
+
+// 查询
+const users = await prisma.user.findMany()
+
+// 创建
+const user = await prisma.user.create({
+  data: { openid: 'xxx', nickname: 'xxx' }
+})
+
+// 更新
+await prisma.user.update({
+  where: { id: 'xxx' },
+  data: { nickname: 'yyy' }
+})
+
+// 删除
+await prisma.user.delete({ where: { id: 'xxx' } })
 ```
 
 ## 测试
