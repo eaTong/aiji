@@ -37,7 +37,7 @@ function calcSetVolume(weight: number, reps: number): number {
 /**
  * 计算 E1RM (Epley公式)
  */
-function calcE1RM(weight: number, reps: number): number {
+export function calcE1RM(weight: number, reps: number): number {
   if (reps <= 0) return 0
   return Math.round(weight * (1 + reps / 30) * 10) / 10
 }
