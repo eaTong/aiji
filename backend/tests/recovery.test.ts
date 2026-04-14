@@ -208,6 +208,7 @@ describe('recovery with training logs', () => {
         weight: 80,
         reps: 10,
         isWarmup: false,
+        muscleVolumes: { chest: 800, triceps: 400, front_delts: 400 },
         completedAt: new Date(), // just now
       },
     })

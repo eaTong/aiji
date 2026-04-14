@@ -18,12 +18,13 @@ afterAll(async () => {
 })
 
 afterEach(async () => {
+  // Clean up test data but NOT exercises (they are shared reference data)
   await prisma.plannedExercise.deleteMany()
   await prisma.planDay.deleteMany()
   await prisma.workoutPlan.deleteMany()
   await prisma.logEntry.deleteMany()
   await prisma.trainingLog.deleteMany()
-  await prisma.exercise.deleteMany()
+  // Do NOT delete exercises - they are seeded once and shared across tests
   await prisma.recoveryStatus.deleteMany()
   await prisma.progressPhoto.deleteMany()
   await prisma.measurementRecord.deleteMany()
