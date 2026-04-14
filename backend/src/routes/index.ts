@@ -6,6 +6,7 @@ import exerciseRouter from './exercise'
 import trainingLogRouter from './trainingLog'
 import recoveryRouter from './recovery'
 import trainingPlanRouter from './trainingPlan'
+import trainingRouter from './training'
 
 const router = new Router()
 router.use(authRouter.routes())
@@ -15,5 +16,6 @@ router.use(exerciseRouter.routes())
 router.use(trainingLogRouter.routes())
 router.use(recoveryRouter.routes())
 router.use(trainingPlanRouter.routes())
+router.use(trainingRouter.routes())
 
 export default router

@@ -56,36 +56,11 @@
     </view>
 
     <!-- Exercise picker modal -->
-    <view class="picker-overlay" v-if="showExercisePicker" @tap="showExercisePicker = false">
-      <view class="picker-sheet" @tap.stop>
-        <view class="picker-header">
-          <text class="picker-title">选择动作</text>
-          <view class="picker-close" @tap="showExercisePicker = false">
-            <text>×</text>
-          </view>
-        </view>
-        <view class="picker-search">
-          <input
-            type="text"
-            v-model="searchKeyword"
-            placeholder="搜索动作"
-            class="search-input"
-            @input="filterExercises"
-          />
-        </view>
-        <scroll-view class="picker-list" scroll-y>
-          <view
-            class="picker-item"
-            v-for="exercise in filteredExercises"
-            :key="exercise.id"
-            @tap="addExercise(exercise)"
-          >
-            <text class="picker-item-name">{{ exercise.name }}</text>
-            <text class="picker-item-muscles">{{ exercise.primaryMuscles.join(', ') }}</text>
-          </view>
-        </scroll-view>
-      </view>
-    </view>
+    <ExerciseSelector
+      :visible="showExercisePicker"
+      @close="showExercisePicker = false"
+      @select="onExerciseSelect"
+    />
 
     <!-- Rest timer -->
     <RestTimer
@@ -124,6 +99,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import ExerciseCard from '../../components/training/ExerciseCard.vue'
 import SetInput from '../../components/training/SetInput.vue'
 import RestTimer from '../../components/training/RestTimer.vue'
+import ExerciseSelector from '../../components/training/ExerciseSelector.vue'
 import {
   startTrainingLog,
   finishTrainingLog,
@@ -133,6 +109,28 @@ import {
 } from '../../api/trainingLog'
 import { getExercises } from '../../api/exercise'
 import type { Exercise } from '../../api/exercise'
+
+// 预填动作的接口
+interface RecommendedExercise {
+  name: string
+  sets: number
+  reps: string
+  lastWeight?: number
+}
+
+interface RecommendedTraining {
+  name: string
+  duration: number
+  type: string
+  targetMuscle: string
+  exercises: RecommendedExercise[]
+  reason: string
+}
+
+// 获取页面参数
+const pageInstance = getCurrentInstance()
+const preloadedTraining = ref<RecommendedTraining | null>(null)
+const preloadedExercises = ref<{ id: string; name: string; sets: number; reps: string; lastWeight?: number }[]>([])
 
 interface ExerciseItem {
   exercise: Exercise
@@ -162,8 +160,6 @@ const totalVolume = ref(0)
 const elapsedSeconds = ref(0)
 const timerVisible = ref(false)
 const showExercisePicker = ref(false)
-const searchKeyword = ref('')
-const filteredExercises = ref<Exercise[]>([])
 const allExercises = ref<Exercise[]>([])
 const showSummary = ref(false)
 const summaryData = ref({ totalVolume: 0, duration: 0, exerciseCount: 0 })
@@ -240,26 +236,16 @@ async function finishTraining() {
 async function loadExercises() {
   try {
     allExercises.value = await getExercises()
-    filteredExercises.value = allExercises.value
   } catch (err) {
     console.error('Failed to load exercises:', err)
   }
 }
 
-function filterExercises() {
-  const keyword = searchKeyword.value.toLowerCase()
-  if (!keyword) {
-    filteredExercises.value = allExercises.value
-  } else {
-    filteredExercises.value = allExercises.value.filter(
-      (ex) =>
-        ex.name.toLowerCase().includes(keyword) ||
-        ex.primaryMuscles.some((m) => m.toLowerCase().includes(keyword))
-    )
-  }
-}
+async function onExerciseSelect(exerciseData: { id: string; name: string }) {
+  // Find full exercise from allExercises
+  const exercise = allExercises.value.find(e => e.id === exerciseData.id)
+  if (!exercise) return
 
-async function addExercise(exercise: Exercise) {
   // Check if already added
   if (exerciseItems.value.some((item) => item.exercise.id === exercise.id)) {
     uni.showToast({ title: '该动作已添加', icon: 'none' })
@@ -284,7 +270,6 @@ async function addExercise(exercise: Exercise) {
 
   exerciseItems.value.push({ exercise, lastRecord })
   showExercisePicker.value = false
-  searchKeyword.value = ''
 }
 
 function onExerciseChange(exerciseId: string, sets: SetData[]) {
@@ -363,7 +348,53 @@ async function checkExistingLog() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  // 解析页面参数
+  const pages = getCurrentPages()
+  const currentPage = pages[pages.length - 1] as any
+  const options = currentPage.options || {}
+
+  // 解析预填的训练数据
+  if (options.training) {
+    try {
+      preloadedTraining.value = JSON.parse(decodeURIComponent(options.training))
+      // 预填动作到列表
+      if (preloadedTraining.value?.exercises) {
+        await loadExercises()
+        for (const ex of preloadedTraining.value.exercises) {
+          const matched = allExercises.value.find(
+            e => e.name === ex.name || e.nameEn === ex.name
+          )
+          if (matched) {
+            preloadedExercises.value.push({
+              id: matched.id,
+              name: matched.name,
+              sets: ex.sets,
+              reps: ex.reps,
+              lastWeight: ex.lastWeight
+            })
+          }
+        }
+        // 如果有预填动作，自动开始训练
+        if (preloadedExercises.value.length > 0) {
+          await startTrainingLog()
+          // 添加预填的动作
+          for (const ex of preloadedExercises.value) {
+            const exercise = allExercises.value.find(e => e.id === ex.id)
+            if (exercise) {
+              exerciseItems.value.push({
+                exercise,
+                lastRecord: ex.lastWeight ? { weight: ex.lastWeight, reps: parseInt(ex.reps) } : undefined
+              })
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('解析预填数据失败', e)
+    }
+  }
+
   loadExercises()
   checkExistingLog()
 })
