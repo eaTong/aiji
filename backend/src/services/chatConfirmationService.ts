@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client'
 import * as chatService from './chatService'
 import * as chatTrainingService from './chatTrainingService'
 import * as bodyDataService from './bodyDataService'
+import * as dietService from './dietService'
 import * as incentiveService from './incentiveService'
 
 const prisma = new PrismaClient()
@@ -166,10 +167,12 @@ async function handleDietConfirmation(
   userId: string,
   cardData: Record<string, any>
 ): Promise<ConfirmationResult> {
-  const { calories, meals, date } = cardData
+  const { meals, date } = cardData
 
-  // 饮食记录暂不实现具体保存逻辑
-  // TODO: 实现饮食记录保存
+  // 保存饮食记录
+  if (meals && Array.isArray(meals) && meals.length > 0) {
+    await dietService.createDietRecords(userId, meals, date)
+  }
 
   // 检查成就触发
   const incentiveCard = await checkAndGenerateIncentive(userId, 'diet-record')

@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import * as aiChatService from './aiChatService'
 
 const prisma = new PrismaClient()
 
@@ -174,16 +175,13 @@ async function checkMorningReport(userId: string, hour: number): Promise<void> {
   const canSend = await canSendPush(userId, 'morning-report', 24)
   if (!canSend) return
 
-  // TODO: 调用 aiChatService.generateMorningReport
-  // 目前简化为直接入队
+  // 调用 aiChatService.generateMorningReport 获取真实数据
+  const report = await aiChatService.generateMorningReport(userId)
   await enqueuePush(
     userId,
     'morning-report',
-    {
-      greeting: '早上好！',
-      date: new Date().toISOString().split('T')[0]
-    },
-    [],
+    report.cardData || report.data || {},
+    report.actions || [],
     new Date(),
     120, // 2小时有效
     10 // 高优先级
@@ -205,30 +203,17 @@ async function checkWeeklyReport(
   const canSend = await canSendPush(userId, 'weekly-report', 168) // 7天
   if (!canSend) return
 
-  // TODO: 调用 aiChatService.generateWeeklyReport
+  // 调用 aiChatService.generateWeeklyReport 获取真实数据
+  const report = await aiChatService.generateWeeklyReport(userId)
   await enqueuePush(
     userId,
     'weekly-report',
-    {
-      weekStart: getWeekStart(new Date()),
-      weekEnd: new Date().toISOString().split('T')[0]
-    },
-    [],
+    report.cardData || report.data || {},
+    report.actions || [],
     new Date(),
     1440, // 24小时有效
     10 // 高优先级
   )
-}
-
-/**
- * 获取本周开始日期
- */
-function getWeekStart(date: Date): string {
-  const d = new Date(date)
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1) // 调整周一为开始
-  d.setDate(diff)
-  return d.toISOString().split('T')[0]
 }
 
 /**

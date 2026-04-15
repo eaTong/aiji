@@ -1,5 +1,6 @@
 import { PrismaClient, ArticleType, ArticleStatus } from '@prisma/client'
 import { success, fail } from '../../types'
+import * as aiGatewayService from '../aiGatewayService'
 
 const prisma = new PrismaClient()
 
@@ -145,8 +146,23 @@ export async function deleteArticle(id: string) {
 }
 
 export async function generateArticleContent(prompt: string) {
-  // TODO: 调用 AI Gateway Service 生成内容
-  return success({ content: 'AI generated content placeholder' })
+  // 检查 AI 服务是否可用
+  if (!aiGatewayService.isAIServiceAvailable()) {
+    return success({ content: 'AI 服务未配置，请联系管理员配置 AI_API_KEY' })
+  }
+
+  // 调用 AI Gateway Service 生成内容
+  const response = await aiGatewayService.callAI({
+    userId: 'system',
+    message: prompt,
+    intent: 'CHITCHAT'
+  })
+
+  if (response.error) {
+    return success({ content: `AI 生成失败: ${response.error}` })
+  }
+
+  return success({ content: response.content })
 }
 
 // Contributions

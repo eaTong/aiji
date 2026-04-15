@@ -6,6 +6,8 @@ import * as trainingRecommendService from './trainingRecommendService'
 import * as recoveryService from './recoveryService'
 import * as chatTrainingService from './chatTrainingService'
 import * as aiGatewayService from './aiGatewayService'
+import * as dietService from './dietService'
+import { getTodayPlan } from './chatGreetingService'
 import { getExercises } from './exerciseService'
 
 const { callAI, isAIServiceAvailable } = aiGatewayService
@@ -323,9 +325,10 @@ async function generateDietRecordResponse(
 ): Promise<any> {
   const meals = entities?.meals
 
-  // 如果有数据，返回确认
+  // 如果有数据，保存并返回确认
   if (meals && Array.isArray(meals) && meals.length > 0) {
-    // TODO: 调用 dietService 保存饮食记录
+    // 调用 dietService 保存饮食记录
+    await dietService.createDietRecords(userId, meals)
     return await createAIMessage(userId, {
       type: 'card',
       cardType: 'diet-record',
@@ -811,12 +814,13 @@ async function generateGreetingResponse(userId: string): Promise<any> {
     greeting = '晚上好！'
   }
 
-  // TODO: 检查今日训练计划
-  const hasPlan = false
+  // 检查今日训练计划
+  const todayPlan = await getTodayPlan(userId)
+  const hasPlan = !!todayPlan
 
   let additionalText = ''
   if (hasPlan) {
-    additionalText = '今天有计划，要开始吗？'
+    additionalText = `今天有计划: ${todayPlan?.name || '训练'}，要开始吗？`
   } else {
     additionalText = '今天要训练吗？'
   }
@@ -915,26 +919,69 @@ async function createFallbackResponse(userId: string): Promise<any> {
  * 生成早安日报
  */
 export async function generateMorningReport(userId: string): Promise<any> {
-  // TODO: 获取昨日体重变化、训练记录，今日计划等
+  const now = new Date()
+
+  // 获取昨日日期范围
+  const yesterday = new Date(now)
+  yesterday.setDate(yesterday.getDate() - 1)
+  yesterday.setHours(0, 0, 0, 0)
+  const todayStart = new Date(now)
+  todayStart.setHours(0, 0, 0, 0)
+
+  // 1. 获取昨日体重变化
+  const yesterdayWeight = await prisma.weightRecord.findFirst({
+    where: { userId, recordedAt: { lt: todayStart } },
+    orderBy: { recordedAt: 'desc' }
+  })
+  const todayWeight = await prisma.weightRecord.findFirst({
+    where: { userId, recordedAt: { gte: todayStart } },
+    orderBy: { recordedAt: 'desc' }
+  })
+  const weightChange = yesterdayWeight && todayWeight
+    ? Number((todayWeight.weight - yesterdayWeight.weight).toFixed(1))
+    : null
+
+  // 2. 获取昨日训练记录
+  const yesterdayLogs = await prisma.trainingLog.findFirst({
+    where: {
+      userId,
+      startedAt: { gte: yesterday, lt: todayStart },
+      status: 'COMPLETED'
+    },
+    include: { logEntries: { where: { isWarmup: false } } }
+  })
+
+  // 3. 获取今日计划
+  const todayPlanData = await getTodayPlan(userId)
+
+  // 4. 获取恢复状态
+  const recoveryStatus = await prisma.recoveryStatus.findFirst({
+    where: { userId, date: { gte: todayStart } }
+  })
+
   return await createAIMessage(userId, {
     type: 'card',
     cardType: 'morning-report',
     cardData: {
       greeting: '早上好！',
-      date: new Date().toISOString().split('T')[0],
+      date: now.toISOString().split('T')[0],
       yesterdaySummary: {
-        weightChange: -0.3,
-        trainingDone: true,
-        trainingName: '背部训练',
-        totalVolume: 4500
+        weightChange,
+        trainingDone: !!yesterdayLogs,
+        trainingName: yesterdayLogs?.planDayId
+          ? (await prisma.planDay.findUnique({ where: { id: yesterdayLogs.planDayId } }))?.dayType
+          : (yesterdayLogs?.logEntries[0]?.exerciseName || '训练'),
+        totalVolume: yesterdayLogs?.totalVolume || 0
       },
-      todayPlan: {
-        name: '胸部+三头',
-        type: '推',
-        duration: 45,
-        muscle: 'chest'
-      },
-      recoveryTip: '胸肌恢复 85%，状态良好',
+      todayPlan: todayPlanData ? {
+        name: todayPlanData.name,
+        type: todayPlanData.dayType,
+        duration: todayPlanData.estimatedDuration,
+        muscle: todayPlanData.dayType
+      } : null,
+      recoveryTip: recoveryStatus?.recommendation
+        ? `今日推荐: ${recoveryStatus.recommendation === 'TRAIN' ? '可以训练' : recoveryStatus.recommendation === 'LIGHT' ? '轻量训练' : '建议休息'}`
+        : '状态不错，可以训练',
       motivation: '今天也要加油！'
     },
     actions: [

@@ -402,7 +402,7 @@ async function getEveningHint(userId: string): Promise<string> {
 /**
  * 获取今日计划
  */
-async function getTodayPlan(userId: string): Promise<{
+export async function getTodayPlan(userId: string): Promise<{
   name: string
   dayType: string
   exerciseCount: number

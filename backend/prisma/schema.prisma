@@ -29,6 +29,7 @@ model User {
   measurementRecords MeasurementRecord[]
   progressPhotos     ProgressPhoto[]
   supplementRecords  SupplementRecord[]
+  dietRecords        DietRecord[]
   exercises          Exercise[]
   recoveryStatuses   RecoveryStatus[]
   logEntries         LogEntry[]
@@ -88,6 +89,28 @@ model SupplementRecord {
   user User @relation(fields: [userId], references: [id])
 
   @@unique([userId, date, supplement])
+}
+
+model DietRecord {
+  id             String   @id @default(uuid())
+  userId         String
+  date           DateTime @db.Date
+  mealType       MealType
+  description    String
+  estimatedCalories Int?
+  protein        Float?
+  createdAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date, mealType])
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
 }
 
 model ProgressPhoto {
