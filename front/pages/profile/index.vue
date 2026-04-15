@@ -27,6 +27,12 @@
     </view>
 
     <!-- 收藏动作入口 -->
+    <view class="menu-card" @tap="goKnowledge">
+      <text class="menu-icon">📚</text>
+      <text class="menu-label">知识库</text>
+      <text class="menu-arrow">›</text>
+    </view>
+
     <view class="menu-card" @tap="goFavorites">
       <text class="menu-icon">⭐</text>
       <text class="menu-label">收藏的动作</text>
@@ -66,6 +72,10 @@ function goEdit() {
 
 function goFavorites() {
   uni.navigateTo({ url: '/pages/training/favorites' })
+}
+
+function goKnowledge() {
+  uni.navigateTo({ url: '/pages/knowledge/index' })
 }
 
 onMounted(() => userStore.fetchProfile())

@@ -18,6 +18,10 @@
         <text class="action-icon">❓</text>
         <text class="action-text">问教练</text>
       </view>
+      <view class="action-btn" @click="navigateTo('/pages/knowledge/index')">
+        <text class="action-icon">📚</text>
+        <text class="action-text">查知识</text>
+      </view>
       <view class="action-btn action-btn-primary" @click="handleRecommendTraining">
         <text class="action-icon">🎯</text>
         <text class="action-text">练什么</text>
