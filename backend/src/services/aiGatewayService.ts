@@ -6,6 +6,165 @@ import { parseTrainingInput } from './trainingRecordParser'
 const prisma = new PrismaClient()
 
 // ============================================
+// JSON 增量提取缓存
+// ============================================
+
+interface ExtractionCache {
+  [requestId: string]: {
+    extractedJsonList: string[]
+    nextStartPos: number
+    totalLength: number
+    completed: boolean
+    updatedAt: string
+  }
+}
+
+const CACHE_FILE = 'cache/extracted-json-cache.json'
+
+/**
+ * 加载提取缓存
+ */
+function loadExtractionCache(): ExtractionCache {
+  try {
+    const fs = require('fs')
+    const path = require('path')
+    const cachePath = path.resolve(__dirname, '..', CACHE_FILE)
+    if (fs.existsSync(cachePath)) {
+      const data = fs.readFileSync(cachePath, 'utf-8')
+      return JSON.parse(data)
+    }
+  } catch (e) {
+    logger.warn('[ExtractionCache] 加载缓存失败:', e)
+  }
+  return {}
+}
+
+/**
+ * 保存提取缓存
+ */
+function saveExtractionCache(cache: ExtractionCache): void {
+  try {
+    const fs = require('fs')
+    const path = require('path')
+    const cachePath = path.resolve(__dirname, '..', CACHE_FILE)
+    const dir = path.dirname(cachePath)
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true })
+    }
+    fs.writeFileSync(cachePath, JSON.stringify(cache, null, 2))
+  } catch (e) {
+    logger.warn('[ExtractionCache] 保存缓存失败:', e)
+  }
+}
+
+/**
+ * 从指定位置开始查找下一个 JSON 代码块
+ */
+function findNextJsonBlock(text: string, startPos: number): { content: string | null; endPos: number } {
+  const fromText = text.slice(startPos)
+  // 查找下一个 ```json 或 ``` 标记
+  const codeBlockMatch = fromText.match(/```json\s*([\s\S]*?)\s*```/i)
+  if (codeBlockMatch) {
+    const content = codeBlockMatch[1].trim()
+    const endPos = startPos + fromText.indexOf(codeBlockMatch[0]) + codeBlockMatch[0].length
+    logger.debug('[findNextJsonBlock] 找到 JSON 块', { length: content.length, endPos })
+    return { content, endPos }
+  }
+  // 没有更多代码块了
+  return { content: null, endPos: text.length }
+}
+
+/**
+ * 增量提取 JSON（每次调用提取一个）
+ * @param requestId 请求唯一标识
+ * @param text 原始文本
+ * @returns 提取的 JSON 内容，如果已全部提取则返回 null
+ */
+function extractJsonIncremental(requestId: string, text: string): string | null {
+  const cache = loadExtractionCache()
+  const cached = cache[requestId]
+
+  let startPos = 0
+  let extractedList: string[] = []
+
+  // 如果有缓存，从缓存中恢复状态
+  if (cached && cached.totalLength === text.length) {
+    if (cached.completed) {
+      logger.debug('[extractJsonIncremental] 请求已全部提取完成', { requestId })
+      return null
+    }
+    startPos = cached.nextStartPos
+    extractedList = cached.extractedJsonList
+    logger.debug('[extractJsonIncremental] 从缓存恢复', { startPos, extractedCount: extractedList.length })
+  } else {
+    logger.debug('[extractJsonIncremental] 新请求', { totalLength: text.length })
+  }
+
+  // 查找下一个 JSON 块
+  const { content, endPos } = findNextJsonBlock(text, startPos)
+
+  if (content === null) {
+    // 没有更多 JSON 块了
+    cache[requestId] = {
+      extractedJsonList: extractedList,
+      nextStartPos: text.length,
+      totalLength: text.length,
+      completed: true,
+      updatedAt: new Date().toISOString()
+    }
+    saveExtractionCache(cache)
+    logger.debug('[extractJsonIncremental] 所有 JSON 已提取完成')
+    return null
+  }
+
+  // 更新缓存
+  extractedList.push(content)
+  cache[requestId] = {
+    extractedJsonList: extractedList,
+    nextStartPos: endPos,
+    totalLength: text.length,
+    completed: false,
+    updatedAt: new Date().toISOString()
+  }
+  saveExtractionCache(cache)
+  logger.info('[extractJsonIncremental] 提取完成', { extractedCount: extractedList.length })
+
+  return content
+}
+
+/**
+ * 获取提取进度
+ */
+function getExtractionProgress(requestId: string, text: string): { extracted: number; total: number; completed: boolean } {
+  const cache = loadExtractionCache()
+  const cached = cache[requestId]
+
+  if (!cached || cached.totalLength !== text.length) {
+    return { extracted: 0, total: 0, completed: false }
+  }
+
+  // 统计总共有多少个 JSON 块
+  const allMatches = text.match(/```json\s*[\s\S]*?\s*```/gi) || []
+  return {
+    extracted: cached.extractedJsonList.length,
+    total: allMatches.length,
+    completed: cached.completed
+  }
+}
+
+/**
+ * 重置提取状态
+ */
+function resetExtractionState(requestId: string): void {
+  const cache = loadExtractionCache()
+  if (cache[requestId]) {
+    delete cache[requestId]
+    saveExtractionCache(cache)
+    logger.info('[resetExtractionState] 已重置:', requestId)
+  }
+}
+
+// ============================================
 // 工具函数
 // ============================================
 
@@ -679,3 +838,9 @@ function parseEntitiesLocally(message: string, intent: IntentType): Record<strin
       return {}
   }
 }
+
+// ============================================
+// 增量提取导出
+// ============================================
+
+export { extractJsonIncremental, getExtractionProgress, resetExtractionState }
