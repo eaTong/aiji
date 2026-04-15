@@ -10,6 +10,7 @@ export type SessionStatus = 'ACTIVE' | 'AWAITING_CLARIFICATION' | 'COMPLETED' | 
 export type CardType =
   | 'weight-record'
   | 'measurement-record'
+  | 'measurement-trend'
   | 'weight-trend'
   | 'training-recommend'
   | 'training-editable'
@@ -87,6 +88,25 @@ export interface MeasurementRecordData {
     value?: number
   }>
   unit: 'cm' | 'inch'
+}
+
+export interface MeasurementTrendData {
+  date: string
+  period: number
+  parts: Array<{
+    name: string
+    label: string
+    current?: number
+    change?: number
+    changePercent?: number
+  }>
+  chartData: Array<{
+    date: string
+    chest?: number
+    waist?: number
+    hip?: number
+  }>
+  aiComment?: string
 }
 
 export interface WeightTrendData {

@@ -204,6 +204,30 @@ export interface MeasurementRecordCardData {
 }
 
 /**
+ * 围度趋势卡片
+ * cardType: measurement-trend
+ */
+export interface MeasurementTrendCardData {
+  date?: string
+  period?: number
+  parts?: Array<{
+    name: string
+    label: string
+    current?: number
+    change?: number
+    changePercent?: number
+  }>
+  chartData?: Array<{
+    date: string
+    chest?: number
+    waist?: number
+    hip?: number
+  }>
+  aiComment?: string
+  message?: string
+}
+
+/**
  * 体重趋势卡片
  * cardType: weight-trend
  */
@@ -382,6 +406,7 @@ export type CardType =
   | 'weekly-report'
   | 'achievement'
   | 'measurement-record'
+  | 'measurement-trend'
   | 'weight-trend'
   | 'exercise-detail'
   | 'personal-record'
@@ -402,6 +427,7 @@ export interface CardDataByType {
   'weekly-report': WeeklyReportCardData
   'achievement': AchievementCardData
   'measurement-record': MeasurementRecordCardData
+  'measurement-trend': MeasurementTrendCardData
   'weight-trend': WeightTrendCardData
   'exercise-detail': ExerciseDetailCardData
   'personal-record': PersonalRecordCardData

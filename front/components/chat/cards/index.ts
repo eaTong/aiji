@@ -13,6 +13,11 @@ export { default as MorningReportCard } from './MorningReportCard.vue'
 export { default as WeeklyReportCard } from './WeeklyReportCard.vue'
 export { default as AchievementCard } from './AchievementCard.vue'
 
+// P2 卡片组件
+export { default as MeasurementTrendCard } from './MeasurementTrendCard.vue'
+export { default as GoalProgressCard } from './GoalProgressCard.vue'
+export { default as DietRecordCard } from './DietRecordCard.vue'
+
 // P2-P3 统一渲染组件
 export { default as LegacyCardRenderer } from './LegacyCardRenderer.vue'
 
@@ -27,6 +32,9 @@ import RecoveryStatusCard from './RecoveryStatusCard.vue'
 import MorningReportCard from './MorningReportCard.vue'
 import WeeklyReportCard from './WeeklyReportCard.vue'
 import AchievementCard from './AchievementCard.vue'
+import MeasurementTrendCard from './MeasurementTrendCard.vue'
+import GoalProgressCard from './GoalProgressCard.vue'
+import DietRecordCard from './DietRecordCard.vue'
 import LegacyCardRenderer from './LegacyCardRenderer.vue'
 
 /**
@@ -40,6 +48,9 @@ export const cardTypeMap = {
   'morning-report': MorningReportCard,
   'weekly-report': WeeklyReportCard,
   'achievement': AchievementCard,
+  'measurement-trend': MeasurementTrendCard,
+  'goal-progress': GoalProgressCard,
+  'diet-record': DietRecordCard,
 } as const
 
 /**

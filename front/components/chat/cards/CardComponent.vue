@@ -63,6 +63,33 @@
       @action="handleAction"
     />
 
+    <!-- measurement-trend 卡片 -->
+    <MeasurementTrendCard
+      v-else-if="cardType === 'measurement-trend'"
+      :card-data="(cardData as any)"
+      :actions="actions"
+      :disabled="disabled"
+      @action="handleAction"
+    />
+
+    <!-- goal-progress 卡片 -->
+    <GoalProgressCard
+      v-else-if="cardType === 'goal-progress'"
+      :card-data="(cardData as any)"
+      :actions="actions"
+      :disabled="disabled"
+      @action="handleAction"
+    />
+
+    <!-- diet-record 卡片 -->
+    <DietRecordCard
+      v-else-if="cardType === 'diet-record'"
+      :card-data="(cardData as any)"
+      :actions="actions"
+      :disabled="disabled"
+      @action="handleAction"
+    />
+
     <!-- P2-P3 其他卡片统一渲染 -->
     <LegacyCardRenderer
       v-else-if="cardType"
@@ -89,7 +116,10 @@ import {
   RecoveryStatusCard,
   MorningReportCard,
   WeeklyReportCard,
-  AchievementCard
+  AchievementCard,
+  MeasurementTrendCard,
+  GoalProgressCard,
+  DietRecordCard
 } from './index'
 
 const props = defineProps<{

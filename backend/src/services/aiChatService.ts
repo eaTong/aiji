@@ -56,6 +56,9 @@ export async function chat(
     case 'QUERY_TREND':
       return await generateWeightTrendResponse(userId)
 
+    case 'QUERY_MEASUREMENT_TREND':
+      return await generateMeasurementTrend(userId, 90)
+
     default:
       return await generateDefaultResponse(userId, message, intent)
   }
@@ -194,6 +197,121 @@ async function generateMeasurementRecordResponse(
       { id: 'save', label: '保存', action: 'save' }
     ]
   })
+}
+
+/**
+ * 生成围度趋势卡片
+ */
+export async function generateMeasurementTrend(userId: string, days = 90): Promise<any> {
+  try {
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+
+    const records = await bodyDataService.getMeasurementRecords(
+      userId,
+      startDate.toISOString().split('T')[0],
+      endDate.toISOString().split('T')[0]
+    )
+
+    if (!records || records.length === 0) {
+      return await createAIMessage(userId, {
+        type: 'card',
+        cardType: 'measurement-trend',
+        cardData: {
+          message: '暂无围度记录，开始记录第一条吧！'
+        },
+        actions: [
+          { id: 'record', label: '记录围度', action: 'navigate', target: '/pages/data/measurements' },
+          { id: 'dismiss', label: '关闭', action: 'dismiss' }
+        ]
+      })
+    }
+
+    // 计算各部位的变化
+    const partLabels: Record<string, string> = {
+      chest: '胸围',
+      waist: '腰围',
+      hip: '臀围',
+      leftArm: '左臂',
+      rightArm: '右臂',
+      leftThigh: '左大腿',
+      rightThigh: '右大腿',
+      leftCalf: '左小腿',
+      rightCalf: '右小腿'
+    }
+
+    const latestRecord = records[records.length - 1]
+    const earliestRecord = records[0]
+
+    // 计算各部位的变化
+    const changes: Record<string, { current: number; change: number; changePercent: number }> = {}
+    for (const part of Object.keys(partLabels)) {
+      const current = (latestRecord as any)[part]
+      const previous = (earliestRecord as any)[part]
+      if (current !== undefined && previous !== undefined) {
+        const change = current - previous
+        const changePercent = previous !== 0 ? Math.round((change / previous) * 100) : 0
+        changes[part] = { current, change, changePercent }
+      }
+    }
+
+    // 获取最近几次记录用于趋势展示
+    const recentRecords = records.slice(-10).map(r => ({
+      date: r.recordedAt.toISOString().split('T')[0],
+      chest: r.chest,
+      waist: r.waist,
+      hip: r.hip
+    }))
+
+    // 生成 AI 点评
+    let aiComment = ''
+    if (Object.keys(changes).length > 0) {
+      const changeEntries = Object.entries(changes).filter(([, v]) => v.change !== 0)
+      if (changeEntries.length > 0) {
+        const [part, data] = changeEntries[0]
+        const label = partLabels[part]
+        if (data.change > 0) {
+          aiComment = `${label}相比首次记录增加了${data.change.toFixed(1)}cm，继续保持！`
+        } else {
+          aiComment = `${label}相比首次记录减少了${Math.abs(data.change).toFixed(1)}cm，效果不错！`
+        }
+      }
+    }
+
+    return await createAIMessage(userId, {
+      type: 'card',
+      cardType: 'measurement-trend',
+      cardData: {
+        date: latestRecord.recordedAt.toISOString().split('T')[0],
+        period: days,
+        parts: Object.keys(partLabels).map(part => ({
+          name: part,
+          label: partLabels[part],
+          current: changes[part]?.current,
+          change: changes[part]?.change,
+          changePercent: changes[part]?.changePercent
+        })),
+        chartData: recentRecords,
+        aiComment
+      },
+      actions: [
+        { id: 'viewDetail', label: '查看详情', action: 'navigate', target: '/pages/data/measurements' },
+        { id: 'dismiss', label: '关闭', action: 'dismiss' }
+      ]
+    })
+  } catch (error) {
+    return await createAIMessage(userId, {
+      type: 'card',
+      cardType: 'measurement-trend',
+      cardData: {
+        message: '获取围度趋势失败'
+      },
+      actions: [
+        { id: 'dismiss', label: '关闭', action: 'dismiss' }
+      ]
+    })
+  }
 }
 
 /**
