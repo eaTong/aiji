@@ -49,3 +49,4 @@ front/node_modules/
 .nyc_output/
 
 scripts/import-free-exercises-db/.superpowers/
+.worktrees/
