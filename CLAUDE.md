@@ -210,7 +210,9 @@ Pages → Components/API
   - 单元测试: `backend/tests/unit/admin/`
   - 集成测试: `backend/tests/integration/admin/`
 - 前端: `front/tests/**/*.test.ts`
-- 运营端: `admin/src/__tests__/`
+- 运营端:
+  - 组件测试: `admin/src/__tests__/`
+  - E2E 测试: `admin/tests/e2e/`
 
 ### 测试覆盖目标
 | 模块 | 覆盖率目标 |
@@ -220,9 +222,19 @@ Pages → Components/API
 | Admin API | ≥ 70% |
 | Admin Pages/Components | ≥ 70% |
 | Front Pages | ≥ 70% |
+| Playwright E2E | 核心流程覆盖 |
+
+### E2E 测试 (Playwright)
+```bash
+cd admin
+npm run test:e2e        # 运行 E2E 测试
+npm run test:e2e:ui    # UI 模式
+npm run test:e2e:headed # 有头模式
+```
 
 ### 提交前检查
 - [ ] 后端测试通过 (`npm test`)
 - [ ] 前端测试通过 (`npm test`)
+- [ ] Playwright E2E 测试通过 (`npm run test:e2e`)
 - [ ] TypeScript 编译通过 (`tsc --noEmit`)
 - [ ] 相关文档已更新（需求/计划文档）

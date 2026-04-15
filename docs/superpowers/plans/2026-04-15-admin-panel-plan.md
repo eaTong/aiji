@@ -42,6 +42,13 @@ aiji/
 │   │   ├── Dashboard.test.tsx
 │   │   ├── MainLayout.test.tsx
 │   │   └── api/
+│   ├── tests/e2e/                    # Playwright E2E 测试
+│   │   ├── login.spec.ts
+│   │   ├── dashboard.spec.ts
+│   │   ├── users.spec.ts
+│   │   ├── knowledge.spec.ts
+│   │   └── navigation.spec.ts
+│   ├── playwright.config.ts
 │   └── package.json
 ├── backend/                            # 现有: Koa 后端
 │   ├── src/
@@ -1832,7 +1839,294 @@ Modify `front/pages/profile/index.vue`
 
 ---
 
-## Part 8: CLAUDE.md 更新
+## Part 8: Playwright E2E 测试
+
+### Task 8.1: Playwright 安装与配置
+
+**Files:**
+- Create: `admin/playwright.config.ts`
+- Create: `admin/tests/e2e/.auth/admin-user.json` (GitHub Actions secret)
+
+```typescript
+// admin/playwright.config.ts
+import { defineConfig, devices } from '@playwright/test'
+
+export default defineConfig({
+  testDir: './tests/e2e',
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: 'html',
+  use: {
+    baseURL: 'http://localhost:5173',
+    trace: 'on-first-retry',
+  },
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+  ],
+  webServer: {
+    command: 'npm run dev',
+    url: 'http://localhost:5173',
+    reuseExistingServer: !process.env.CI,
+  },
+})
+```
+
+**package.json 补充:**
+```json
+{
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  }
+}
+```
+
+- [ ] **Step 1: 安装 Playwright**
+
+Run: `cd admin && npm install -D @playwright/test && npx playwright install chromium`
+
+- [ ] **Step 2: 创建 Playwright 配置**
+
+Create `admin/playwright.config.ts`
+
+- [ ] **Step 3: 创建登录 E2E 测试**
+
+Create `admin/tests/e2e/login.spec.ts`
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add admin/playwright.config.ts admin/tests/e2e/login.spec.ts
+git commit -m "test: add Playwright E2E test infrastructure"
+```
+
+---
+
+### Task 8.2: Playwright E2E 测试用例
+
+**Files:**
+- Create: `admin/tests/e2e/login.spec.ts`
+- Create: `admin/tests/e2e/dashboard.spec.ts`
+- Create: `admin/tests/e2e/users.spec.ts`
+- Create: `admin/tests/e2e/knowledge.spec.ts`
+- Create: `admin/tests/e2e/navigation.spec.ts`
+
+**login.spec.ts:**
+```typescript
+import { test, expect } from '@playwright/test'
+
+test.describe('Login Flow', () => {
+  test('should login with valid credentials', async ({ page }) => {
+    await page.goto('/login')
+
+    await page.getByLabel('用户名').fill('admin')
+    await page.getByLabel('密码').fill('admin123')
+    await page.getByRole('button', { name: '登录' }).click()
+
+    await expect(page).toHaveURL('/dashboard')
+    await expect(page.getByText('数据看板')).toBeVisible()
+  })
+
+  test('should show error with invalid credentials', async ({ page }) => {
+    await page.goto('/login')
+
+    await page.getByLabel('用户名').fill('admin')
+    await page.getByLabel('密码').fill('wrongpassword')
+    await page.getByRole('button', { name: '登录' }).click()
+
+    await expect(page.getByText('用户名或密码错误')).toBeVisible()
+  })
+
+  test('should redirect to login when accessing protected route', async ({ page }) => {
+    await page.goto('/dashboard')
+
+    await expect(page).toHaveURL(/\/login/)
+  })
+})
+```
+
+**dashboard.spec.ts:**
+```typescript
+import { test, expect } from '@playwright/test'
+
+test.describe('Dashboard', () => {
+  test.beforeEach(async ({ page }) => {
+    // Login first
+    await page.goto('/login')
+    await page.getByLabel('用户名').fill('admin')
+    await page.getByLabel('密码').fill('admin123')
+    await page.getByRole('button', { name: '登录' }).click()
+    await expect(page).toHaveURL('/dashboard')
+  })
+
+  test('should display statistics cards', async ({ page }) => {
+    await expect(page.getByText('总用户数')).toBeVisible()
+    await expect(page.getByText('今日新增')).toBeVisible()
+    await expect(page.getByText('总训练次数')).toBeVisible()
+    await expect(page.getByText('今日训练')).toBeVisible()
+  })
+
+  test('should display real data', async ({ page }) => {
+    // Wait for API call to complete
+    await page.waitForSelector('[class*="statistic"]')
+
+    // Check that values are numbers
+    const totalUsers = await page.locator('text=总用户数').locator('..').textContent()
+    expect(totalUsers).toMatch(/\d+/)
+  })
+})
+```
+
+**users.spec.ts:**
+```typescript
+import { test, expect } from '@playwright/test'
+
+test.describe('User Management', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/login')
+    await page.getByLabel('用户名').fill('admin')
+    await page.getByLabel('密码').fill('admin123')
+    await page.getByRole('button', { name: '登录' }).click()
+    await page.goto('/users')
+  })
+
+  test('should display user list', async ({ page }) => {
+    await expect(page.getByRole('table')).toBeVisible()
+    await expect(page.getByText('用户管理')).toBeVisible()
+  })
+
+  test('should search users by keyword', async ({ page }) => {
+    const searchInput = page.getByPlaceholder('搜索用户名')
+    await searchInput.fill('test')
+    await page.getByRole('button', { name: '搜索' }).click()
+
+    // Table should update
+    await expect(page.getByRole('table')).toBeVisible()
+  })
+
+  test('should paginate users', async ({ page }) => {
+    // Check pagination controls exist
+    await expect(page.getByText('共')).toBeVisible()
+    await expect(page.getByRole('button', { name: '下一页' })).toBeVisible()
+  })
+})
+```
+
+**knowledge.spec.ts:**
+```typescript
+import { test, expect } from '@playwright/test'
+
+test.describe('Knowledge Management', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/login')
+    await page.getByLabel('用户名').fill('admin')
+    await page.getByLabel('密码').fill('admin123')
+    await page.getByRole('button', { name: '登录' }).click()
+    await page.goto('/knowledge')
+  })
+
+  test('should display article list', async ({ page }) => {
+    await expect(page.getByText('知识库')).toBeVisible()
+    await expect(page.locator('table')).toBeVisible()
+  })
+
+  test('should filter articles by type', async ({ page }) => {
+    await page.getByRole('tab', { name: '健身百科' }).click()
+    await expect(page.getByRole('tab', { name: '健身百科' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  test('should create new article', async ({ page }) => {
+    await page.getByRole('button', { name: '新建文章' }).click()
+    await expect(page.getByText('文章编辑')).toBeVisible()
+
+    await page.getByLabel('标题').fill('测试文章')
+    await page.locator('[contenteditable]').first().fill('测试内容')
+
+    await page.getByRole('button', { name: '保存' }).click()
+    await expect(page.getByText('文章创建成功')).toBeVisible()
+  })
+})
+```
+
+**navigation.spec.ts:**
+```typescript
+import { test, expect } from '@playwright/test'
+
+test.describe('Navigation', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/login')
+    await page.getByLabel('用户名').fill('admin')
+    await page.getByLabel('密码').fill('admin123')
+    await page.getByRole('button', { name: '登录' }).click()
+  })
+
+  test('should navigate to all pages via sidebar', async ({ page }) => {
+    const menuItems = [
+      { label: '看板', path: '/dashboard' },
+      { label: '用户管理', path: '/users' },
+      { label: '动作库', path: '/exercises' },
+      { label: '计划模板', path: '/plans' },
+      { label: '知识库', path: '/knowledge' },
+      { label: '推送运营', path: '/push' },
+      { label: '设置', path: '/settings' },
+    ]
+
+    for (const item of menuItems) {
+      await page.getByText(item.label, { exact: true }).click()
+      await expect(page).toHaveURL(item.path)
+    }
+  })
+
+  test('should show admin avatar in header', async ({ page }) => {
+    await expect(page.locator('.ant-avatar')).toBeVisible()
+  })
+
+  test('should logout via dropdown', async ({ page }) => {
+    await page.locator('.ant-avatar').click()
+    await page.getByText('退出登录').click()
+
+    await expect(page).toHaveURL('/login')
+  })
+})
+```
+
+- [ ] **Step 1: 创建 dashboard E2E 测试**
+
+Create `admin/tests/e2e/dashboard.spec.ts`
+
+- [ ] **Step 2: 创建 users E2E 测试**
+
+Create `admin/tests/e2e/users.spec.ts`
+
+- [ ] **Step 3: 创建 knowledge E2E 测试**
+
+Create `admin/tests/e2e/knowledge.spec.ts`
+
+- [ ] **Step 4: 创建 navigation E2E 测试**
+
+Create `admin/tests/e2e/navigation.spec.ts`
+
+- [ ] **Step 5: 运行 E2E 测试验证**
+
+Run: `cd admin && npm run test:e2e`
+Expected: All tests pass
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add admin/tests/e2e/
+git commit -m "test: add Playwright E2E tests for admin panel"
+```
+
+---
+
+## Part 9: CLAUDE.md 更新
 
 ### Task 8.1: 更新架构文档
 
@@ -1890,12 +2184,14 @@ Add admin project structure and development workflow
 3. **类型一致性:** 方法名、参数类型在各 task 中保持一致
 
 4. **测试覆盖:**
-   - [x] Admin Service 单元测试 (authService, userService, knowledgeService, statsService, exerciseService, planService, pushService)
+   - [x] Admin Service 单元测试 (auth, user, knowledge, stats, exercise, plan, push)
    - [x] Admin API 集成测试 (auth, users, knowledge)
-   - [x] Admin 组件测试 (Login, Dashboard, Layout)
-   - [x] 小程序知识库页面测试
+   - [x] Admin 组件测试 (Login, Dashboard, Layout) — Vitest + RTL
+   - [x] Playwright E2E 测试 (login, dashboard, users, knowledge, navigation)
+   - [x] 小程序知识库页面测试 (Vitest)
 
 5. **覆盖率目标:**
    - Backend Services: ≥ 80%
    - Backend Controllers: ≥ 70%
-   - Frontend Pages: ≥ 70%
+   - Admin 组件测试: ≥ 70%
+   - Playwright E2E: 核心流程覆盖
