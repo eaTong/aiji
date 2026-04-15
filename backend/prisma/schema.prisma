@@ -21,6 +21,7 @@ model User {
   currentPhase      Phase     @default(MAINTAIN)
   fitnessDuration   FitnessDuration?
   hasCompletedOnboarding Boolean @default(false)
+  role              UserRole  @default(USER)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -38,6 +39,8 @@ model User {
   pushQueues         PushQueue[]
   pushRecords        PushRecord[]
   achievements       Achievement[]
+  articles           Article[]
+  contributions      UserContribution[]
 }
 
 model WeightRecord {
@@ -103,6 +106,11 @@ enum Goal {
   GAIN_MUSCLE
   BODY_SHAPE
   IMPROVE_FITNESS
+}
+
+enum UserRole {
+  USER
+  ADMIN
 }
 
 enum Level {
@@ -436,4 +444,115 @@ model Achievement {
   user        User     @relation(fields: [userId], references: [id])
 
   @@unique([userId, type])
+}
+
+// ============================================
+// 运营端管理员日志
+// ============================================
+
+model AdminLog {
+  id        String   @id @default(uuid())
+  adminId   String
+  action    String   // "UPDATE_USER", "DELETE_EXERCISE"
+  target    String   // 资源 ID
+  detail    Json?    // 变更详情
+  createdAt DateTime @default(now())
+}
+
+// ============================================
+// 知识库
+// ============================================
+
+enum ArticleType {
+  KNOWLEDGE   // 健身百科
+  FAQ         // 常见问题
+  COURSE      // 课程内容
+}
+
+enum ArticleStatus {
+  DRAFT       // 草稿
+  PENDING     // 待审核（UGC 提交）
+  PUBLISHED   // 已发布
+  REJECTED    // 已拒绝
+}
+
+enum ContributionType {
+  CREATE      // 新建文章
+  EDIT        // 编辑建议
+}
+
+enum ContributionStatus {
+  PENDING     // 待审核
+  APPROVED    // 已采纳
+  REJECTED    // 已拒绝
+}
+
+model ArticleCategory {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String
+  type      ArticleType
+  parentId  String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  articles  Article[]
+  parent    ArticleCategory? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children  ArticleCategory[] @relation("CategoryHierarchy")
+}
+
+model Article {
+  id          String   @id @default(uuid())
+  title       String
+  slug        String
+  categoryId  String
+  type        ArticleType
+  content     String   @db.Text
+  summary     String?
+  coverImage  String?
+  authorId    String?
+  status      ArticleStatus @default(DRAFT)
+  viewCount   Int      @default(0)
+  likeCount   Int      @default(0)
+  isPinned    Boolean  @default(false)
+  tags        Json     @default("[]")
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category     ArticleCategory  @relation(fields: [categoryId], references: [id])
+  author       User?            @relation(fields: [authorId], references: [id])
+  versions     ArticleVersion[]
+  contributions UserContribution[]
+}
+
+model ArticleVersion {
+  id         String   @id @default(uuid())
+  articleId  String
+  version    Int
+  title      String
+  content    String   @db.Text
+  changedBy  String
+  changeNote String?
+  createdAt  DateTime @default(now())
+
+  article Article @relation(fields: [articleId], references: [id])
+}
+
+model UserContribution {
+  id          String   @id @default(uuid())
+  userId      String
+  articleId   String?
+  type        ContributionType
+  title       String?
+  content     String   @db.Text
+  status      ContributionStatus @default(PENDING)
+  reviewerId  String?
+  reviewNote  String?
+  reviewedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  article Article? @relation(fields: [articleId], references: [id])
 }
