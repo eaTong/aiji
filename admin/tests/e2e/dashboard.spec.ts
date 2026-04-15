@@ -2,11 +2,14 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Dashboard', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/login')
-    await page.getByLabel('用户名').fill('admin')
-    await page.getByLabel('密码').fill('admin123')
-    await page.getByRole('button', { name: '登录' }).click()
-    await expect(page).toHaveURL('/dashboard')
+    await page.goto('http://localhost:5173/admin/login')
+    await page.waitForSelector('input[placeholder="用户名"]')
+    await page.locator('input[placeholder="用户名"]').fill('admin')
+    await page.locator('input[placeholder="密码"]').fill('admin123')
+    await page.locator('button[type="submit"]').click()
+    await page.waitForURL('**/admin/dashboard', { timeout: 10000 })
+    // Wait for sidebar to be visible
+    await page.waitForSelector('.ant-layout-sider', { timeout: 10000 })
   })
 
   test('should display statistics cards', async ({ page }) => {

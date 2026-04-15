@@ -12,11 +12,12 @@ export default function Login() {
       const success = await login(values.username, values.password)
       if (success) {
         message.success('登录成功')
-        navigate('/dashboard')
+        navigate('/dashboard', { replace: true })
       } else {
         message.error('用户名或密码错误')
       }
-    } catch {
+    } catch (e) {
+      console.error('Login error:', e)
       message.error('登录失败')
     }
   }
@@ -25,11 +26,11 @@ export default function Login() {
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
       <Card title="运营端登录" style={{ width: 400 }}>
         <Form form={form} onFinish={handleSubmit} layout="vertical">
-          <Form.Item name="username" label="用户名" rules={[{ required: true, message: '请输入用户名' }]}>
-            <Input />
+          <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}>
+            <Input placeholder="用户名" />
           </Form.Item>
-          <Form.Item name="password" label="密码" rules={[{ required: true, message: '请输入密码' }]}>
-            <Input.Password />
+          <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
+            <Input.Password placeholder="密码" />
           </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit" block>
