@@ -126,44 +126,46 @@ export async function addLogEntry(
 export async function completeTraining(
   logId: string
 ): Promise<Prisma.TrainingLogGetPayload<{}>> {
-  // Fetch all non-warmup entries for this log
-  const entries = await prisma.logEntry.findMany({
-    where: { logId, isWarmup: false },
-  })
+  return prisma.$transaction(async (tx) => {
+    // Fetch all non-warmup entries for this log
+    const entries = await tx.logEntry.findMany({
+      where: { logId, isWarmup: false },
+    })
 
-  // Calculate total volume: sum of all muscleVolumes values
-  // (primary × 1.0 + secondary × 0.5 already baked in)
-  let totalVolume = 0
-  for (const entry of entries) {
-    const volumes = entry.muscleVolumes as Record<string, number> | null
-    if (volumes) {
-      for (const v of Object.values(volumes)) {
-        totalVolume += v
+    // Calculate total volume: sum of all muscleVolumes values
+    // (primary × 1.0 + secondary × 0.5 already baked in)
+    let totalVolume = 0
+    for (const entry of entries) {
+      const volumes = entry.muscleVolumes as Record<string, number> | null
+      if (volumes) {
+        for (const v of Object.values(volumes)) {
+          totalVolume += v
+        }
       }
     }
-  }
 
-  // Get the training log to calculate duration
-  const log = await prisma.trainingLog.findUnique({
-    where: { id: logId },
-  })
+    // Get the training log to calculate duration
+    const log = await tx.trainingLog.findUnique({
+      where: { id: logId },
+    })
 
-  if (!log) {
-    throw Object.assign(new Error('Training log not found'), { status: 404 })
-  }
+    if (!log) {
+      throw Object.assign(new Error('Training log not found'), { status: 404 })
+    }
 
-  const duration = log.startedAt
-    ? Math.floor((Date.now() - log.startedAt.getTime()) / 1000)
-    : null
+    const duration = log.startedAt
+      ? Math.floor((Date.now() - log.startedAt.getTime()) / 1000)
+      : null
 
-  return prisma.trainingLog.update({
-    where: { id: logId },
-    data: {
-      status: 'COMPLETED',
-      completedAt: new Date(),
-      duration,
-      totalVolume: Math.round(totalVolume * 10) / 10,
-    },
+    return tx.trainingLog.update({
+      where: { id: logId },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        duration,
+        totalVolume: Math.round(totalVolume * 10) / 10,
+      },
+    })
   })
 }
 
@@ -232,6 +234,26 @@ export async function getExercisePR(
   }
 
   return { entry: entries[0], e1rm: entries[0].e1rm || 0 }
+}
+
+/**
+ * Get previous best PR (second best entry)
+ */
+export async function getPreviousPR(
+  userId: string,
+  exerciseId: string
+): Promise<{ entry: Prisma.LogEntryGetPayload<{}> | null; e1rm: number }> {
+  const entries = await prisma.logEntry.findMany({
+    where: { userId, exerciseId, isWarmup: false, e1rm: { not: null } },
+    orderBy: { e1rm: 'desc' },
+    take: 2,
+  })
+
+  if (entries.length < 2) {
+    return { entry: null, e1rm: 0 }
+  }
+
+  return { entry: entries[1], e1rm: entries[1].e1rm || 0 }
 }
 
 /**

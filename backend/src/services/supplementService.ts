@@ -17,6 +17,11 @@ export async function createSupplementRecord(
   userId: string,
   data: CreateSupplementData
 ) {
+  // 校验必填字段
+  if (!data.supplement || typeof data.supplement !== 'string' || data.supplement.trim().length === 0) {
+    throw Object.assign(new Error('补剂名称不能为空'), { status: 400 })
+  }
+
   const date = data.date ? new Date(data.date) : new Date()
 
   const record = await prisma.supplementRecord.create({

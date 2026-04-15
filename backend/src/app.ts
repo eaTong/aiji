@@ -10,7 +10,10 @@ const app = new Koa()
 
 app.use(errorMiddleware)
 app.use(loggerMiddleware)
-app.use(cors({ origin: '*', allowMethods: ['GET', 'POST', 'PUT', 'DELETE'] }))
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGIN || 'http://localhost:5173',
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE']
+}))
 app.use(koaBody())
 app.use(router.routes())
 app.use(router.allowedMethods())

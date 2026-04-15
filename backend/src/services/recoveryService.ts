@@ -91,20 +91,11 @@ export async function computeMuscleScores(
     }
   }
 
-  // Get most recent training timestamp per muscle
-  const muscleLastTrained: Record<string, Date> = {}
-  for (const entry of entries) {
-    if (!muscleLastTrained[entry.exerciseId] || entry.completedAt > muscleLastTrained[entry.exerciseId]) {
-      muscleLastTrained[entry.exerciseId] = entry.completedAt
-    }
-  }
-
   // Calculate scores for all known muscles
   const scores: MuscleScores = {}
   for (const [muscle, recoveryHours] of Object.entries(MUSCLE_RECOVERY_HOURS)) {
     const muscleLower = muscle.toLowerCase()
     const totalVol = muscleVolumes[muscleLower] || 0
-    const lastTrained = muscleVolumes[muscleLower + '_at']
 
     if (totalVol === 0) {
       // 从未训练 → 完全恢复

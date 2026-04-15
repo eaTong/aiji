@@ -569,8 +569,11 @@ async function generatePRResponse(
       })
     }
 
-    // 计算改进
-    const improvement = prData.entry.e1rm ? Math.round((prData.entry.e1rm - 90) * 10) / 10 : 0
+    // 计算改进（与上一次最佳相比）
+    const previousPR = await trainingLogService.getPreviousPR(userId, exercise.id)
+    const improvement = (previousPR.entry?.e1rm && prData.entry.e1rm)
+      ? Math.round((prData.entry.e1rm - previousPR.entry.e1rm) * 10) / 10
+      : null
 
     return await createAIMessage(userId, {
       type: 'card',

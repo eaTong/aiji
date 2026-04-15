@@ -238,7 +238,7 @@ async function getRecommendedExercises(
   }
 
   return exercises.map(e => {
-    const sets = userId.length > 0 ? 3 : 4 // 新用户多加一组
+    const sets = 4 // 默认4组
     return {
       name: e.name,
       sets,
