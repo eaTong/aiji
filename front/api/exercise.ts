@@ -12,6 +12,7 @@ export interface Exercise {
   instructionsZh?: string  // 中文说明（优先显示）
   commonMistakes?: string
   warnings?: string  // 注意事项
+  imageUrls?: string  // 图片URL列表，逗号分隔
   isFavorite: boolean
 }
 

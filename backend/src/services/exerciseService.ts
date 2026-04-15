@@ -118,6 +118,7 @@ export async function toggleFavorite(userId: string, exerciseId: string): Promis
         commonMistakes: exercise.commonMistakes,
         warnings: exercise.warnings,
         videoUrl: exercise.videoUrl,
+        imageUrls: exercise.imageUrls,
         isCustom: true,
         isFavorite: true,
         userId,

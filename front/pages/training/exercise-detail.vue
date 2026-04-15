@@ -1,5 +1,17 @@
 <template>
   <view class="container" v-if="exercise">
+    <!-- Image Carousel -->
+    <view v-if="imageUrls.length > 0" class="section image-section">
+      <swiper class="image-swiper" indicator-dots autoplay circular @change="onSwiperChange">
+        <swiper-item v-for="(url, index) in imageUrls" :key="index">
+          <image class="carousel-image" :src="url" mode="aspectFit" />
+        </swiper-item>
+      </swiper>
+      <view class="swiper-indicator">
+        <text>{{ currentImageIndex + 1 }}/{{ imageUrls.length }}</text>
+      </view>
+    </view>
+
     <!-- Header -->
     <view class="section header-section">
       <text class="exercise-name">{{ exercise.name }}</text>
@@ -120,6 +132,17 @@ interface HistoryRecord {
 const exercise = ref<Exercise | null>(null)
 const history = ref<HistoryRecord[]>([])
 const exerciseId = ref('')
+const currentImageIndex = ref(0)
+
+// 计算属性：图片URL列表
+const imageUrls = computed(() => {
+  if (!exercise.value?.imageUrls) return []
+  return exercise.value.imageUrls.split(',').filter(url => url.trim())
+})
+
+function onSwiperChange(e: any) {
+  currentImageIndex.value = e.detail.current
+}
 
 // 计算属性：翻译后的肌肉名称
 const translatedPrimaryMuscles = computed(() => {

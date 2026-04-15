@@ -276,6 +276,7 @@ model Exercise {
   commonMistakes String?  @db.Text
   warnings      String?  @db.Text
   videoUrl      String?
+  imageUrls     String?  @db.Text
   isCustom      Boolean  @default(false)
   isFavorite    Boolean  @default(false)
   userId        String?
