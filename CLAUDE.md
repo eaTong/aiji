@@ -14,12 +14,39 @@ aiji/
 │   ├── 需求/                     # 需求分析文档
 │   ├── 计划/                     # 执行计划文档
 │   ├── superpowers/             # Superpowers 规划文档
+│   │   ├── specs/               # 设计文档
+│   │   └── plans/               # 实施计划
 │   └── 技术文档/                 # 技术规格文档
+├── admin/                        # 运营端 (React + Ant Design + TypeScript)
+│   ├── src/
+│   │   ├── api/                # API 请求封装
+│   │   ├── components/         # 通用组件
+│   │   ├── layouts/            # 布局组件
+│   │   ├── pages/             # 页面 (Login, Dashboard, Users, Exercises, Plans, Knowledge, Push, Settings)
+│   │   ├── stores/             # 状态管理
+│   │   └── types/             # 类型定义
+│   └── vite.config.ts
 ├── front/                        # 前端小程序代码 (uni-app + Vue3)
 └── backend/                      # 后端服务代码 (Koa + Prisma)
+    └── src/
+        ├── routes/admin/       # 运营端 API 路由
+        ├── controllers/admin/  # 运营端 Controller
+        └── services/admin/    # 运营端 Service
 ```
 
 ## 开发命令
+
+### 运营端 (admin/)
+
+```bash
+cd admin
+
+# 开发
+npm run dev                  # 启动开发服务器 (Vite)
+
+# 构建
+npm run build               # 生产构建
+```
 
 ### 后端 (backend/)
 
@@ -55,6 +82,12 @@ npm run test:coverage       # 生成覆盖率报告
 ```
 
 ## 技术栈
+
+### 运营端
+- **框架**: React 18 + TypeScript
+- **UI 库**: Ant Design 5
+- **路由**: React Router 6
+- **构建**: Vite
 
 ### 后端
 - **框架**: Koa + TypeScript
@@ -130,6 +163,25 @@ Pages → Components/API
 ### 4. 需求修改
 修改需求文档 → 确认需求文档 → 生成计划 → 根据计划执行
 
+### 5. 运营端开发 (admin/)
+
+运营端与小程序后台共用，后端路由在 `/admin/*`：
+
+1. **后端 API 开发**
+   - 路由: `backend/src/routes/admin/`
+   - Controller: `backend/src/controllers/admin/`
+   - Service: `backend/src/services/admin/`
+   - 中间件: `backend/src/middleware/adminAuth.ts` (验证 admin role)
+
+2. **前端开发**
+   - 页面: `admin/src/pages/`
+   - API: `admin/src/api/`
+   - 布局: `admin/src/layouts/`
+
+3. **部署**
+   - 运营端构建到 `backend/public/admin/`
+   - API 代理: `/admin/api/*` -> Koa `/admin/api/*`
+
 ## 数据模型
 
 ### 核心实体
@@ -138,6 +190,13 @@ Pages → Components/API
 - **TrainingLog/LogEntry**: 训练记录
 - **RecoveryStatus**: 肌群恢复状态
 - **WorkoutPlan/PlanDay**: 训练计划
+
+### 知识库实体
+- **Article**: 文章（健身百科/FAQ/课程）
+- **ArticleCategory**: 文章分类
+- **ArticleVersion**: 文章版本历史
+- **UserContribution**: 用户贡献（待审核）
+- **AdminLog**: 管理员操作日志
 
 ### 关键计算
 - **E1RM** (Epley公式): `weight × (1 + reps / 30)`
