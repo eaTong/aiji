@@ -8,6 +8,7 @@
 - 用户+内容管理（用户列表、动作库、训练计划模板）
 - 数据统计（基础看板、训练数据）
 - 内容运营（推送模板、定时任务、发送记录）
+- **知识库**（健身百科、FAQ、课程内容，支持 AI 辅助生成和 UGC 贡献审核）
 
 ## 2. 技术选型
 
@@ -65,6 +66,108 @@ model AdminLog {
   target    String   // 资源 ID
   detail    Json?    // 变更详情
   createdAt DateTime @default(now())
+}
+```
+
+### 4.3 知识库模型
+
+```prisma
+// 文章分类
+model ArticleCategory {
+  id          String   @id @default(uuid())
+  name        String   // 分类名称
+  slug        String   // URL 友好标识
+  type        ArticleType
+  parentId    String?  // 父分类
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  articles    Article[]
+  parent      ArticleCategory? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    ArticleCategory[] @relation("CategoryHierarchy")
+}
+
+enum ArticleType {
+  KNOWLEDGE   // 健身百科
+  FAQ         // 常见问题
+  COURSE      // 课程内容
+}
+
+// 文章
+model Article {
+  id          String   @id @default(uuid())
+  title       String
+  slug        String   // URL 友好标识
+  categoryId  String
+  type        ArticleType
+  content     String   @db.Text  // Markdown 内容
+  summary     String?  // 摘要
+  coverImage  String?  // 封面图
+  authorId    String?  // 作者（用户贡献时记录）
+  status      ArticleStatus @default(DRAFT)
+  viewCount   Int      @default(0)
+  likeCount   Int      @default(0)
+  isPinned    Boolean  @default(false)  // 是否置顶
+  tags        Json     // ["增肌", "饮食"]
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category    ArticleCategory @relation(fields: [categoryId], references: [id])
+  author      User?            @relation(fields: [authorId], references: [id])
+  versions    ArticleVersion[]
+  contributions UserContribution[]
+}
+
+enum ArticleStatus {
+  DRAFT       // 草稿
+  PENDING     // 待审核（UGC 提交）
+  PUBLISHED   // 已发布
+  REJECTED    // 已拒绝
+}
+
+// 文章版本历史
+model ArticleVersion {
+  id          String   @id @default(uuid())
+  articleId   String
+  version     Int
+  title       String
+  content     String   @db.Text
+  changedBy   String   // 操作人（admin 或 AI）
+  changeNote  String?  // 变更说明
+  createdAt   DateTime @default(now())
+
+  article     Article @relation(fields: [articleId], references: [id])
+}
+
+// 用户贡献记录
+model UserContribution {
+  id          String   @id @default(uuid())
+  userId      String
+  articleId   String?  // 关联的文章（新建时可能为空）
+  type        ContributionType
+  title       String?  // 建议的标题
+  content     String   @db.Text  // 建议的内容
+  status      ContributionStatus @default(PENDING)
+  reviewerId  String?  // 审核人
+  reviewNote  String?  // 审核意见
+  reviewedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+  article     Article? @relation(fields: [articleId], references: [id])
+}
+
+enum ContributionType {
+  CREATE      // 新建文章
+  EDIT        // 编辑建议
+}
+
+enum ContributionStatus {
+  PENDING     // 待审核
+  APPROVED    // 已采纳
+  REJECTED    // 已拒绝
 }
 ```
 
@@ -130,6 +233,25 @@ model AdminLog {
 | POST | /admin/api/push/send | 立即发送 |
 | GET | /admin/api/push/records | 发送记录 |
 
+### 5.7 知识库模块
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /admin/api/knowledge/categories | 分类列表 |
+| POST | /admin/api/knowledge/categories | 创建分类 |
+| PUT | /admin/api/knowledge/categories/:id | 更新分类 |
+| DELETE | /admin/api/knowledge/categories/:id | 删除分类 |
+| GET | /admin/api/knowledge/articles | 文章列表（支持分类/状态筛选） |
+| GET | /admin/api/knowledge/articles/:id | 文章详情 |
+| POST | /admin/api/knowledge/articles | 创建文章 |
+| PUT | /admin/api/knowledge/articles/:id | 更新文章 |
+| DELETE | /admin/api/knowledge/articles/:id | 删除文章 |
+| POST | /admin/api/knowledge/articles/:id/publish | 发布文章 |
+| POST | /admin/api/knowledge/articles/:id/ai-generate | AI 生成内容 |
+| GET | /admin/api/knowledge/contributions | 用户贡献列表 |
+| POST | /admin/api/knowledge/contributions/:id/review | 审核贡献 |
+| GET | /admin/api/knowledge/stats | 知识库统计 |
+
 ## 6. 运营端前端页面
 
 ### 6.1 页面结构
@@ -143,6 +265,12 @@ model AdminLog {
   └── /admin/exercises/:id   # 动作编辑
 /admin/plans                # 训练计划模板
   └── /admin/plans/:id      # 模板详情/编辑
+/admin/knowledge            # 知识库管理
+  ├── /admin/knowledge/articles     # 文章列表
+  ├── /admin/knowledge/articles/:id # 文章编辑
+  ├── /admin/knowledge/categories  # 分类管理
+  ├── /admin/knowledge/contributions # 用户贡献审核
+  └── /admin/knowledge/stats      # 知识库统计
 /admin/push                 # 推送运营
   ├── /admin/push/templates # 模板管理
   ├── /admin/push/tasks     # 定时任务
@@ -184,8 +312,41 @@ model AdminLog {
 3. 后端：动作库 API
 4. 后端：数据统计 API
 5. 后端：推送运营 API
-6. 前端：项目搭建 + 登录 + 看板
-7. 前端：用户管理页面
-8. 前端：动作库页面
-9. 前端：训练计划页面
-10. 前端：推送运营页面
+6. 后端：知识库 API（含 AI 生成）
+7. 后端：UGC 贡献审核 API
+8. 前端：项目搭建 + 登录 + 看板
+9. 前端：用户管理页面
+10. 前端：动作库页面
+11. 前端：训练计划页面
+12. 前端：知识库管理页面
+13. 前端：推送运营页面
+
+## 10. 小程序端知识库展示
+
+### 10.1 入口位置
+
+| 入口 | 位置 | 形式 |
+|------|------|------|
+| 底部 Tab | "知识" Tab | 列表 + 分类 |
+| AI 对话 | AI 助手页面 | Banner/快捷入口 |
+| 个人中心 | "我的" 页面 | 入口卡片 |
+
+### 10.2 知识库列表页
+
+- 分类标签切换（百科/FAQ/课程）
+- 文章列表（封面图、标题、摘要、发布时间）
+- 搜索功能
+- 热门标签筛选
+
+### 10.3 文章详情页
+
+- Markdown 渲染
+- 点赞/收藏
+- 相关推荐
+- 用户可提交纠错/补充
+
+### 10.4 用户贡献入口
+
+- 文章页底部"完善此内容"按钮
+- 提交贡献表单（标题、补充内容）
+- 提交后状态查询
