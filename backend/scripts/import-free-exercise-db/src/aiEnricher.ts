@@ -6,7 +6,7 @@ import { ProcessedExercise, EnrichedExercise } from './types'
 const CWD = process.cwd()
 const OUTPUT_DIR = join(CWD, 'output')
 const BATCH_SIZE = 2  // 每批处理2个动作
-const CONCURRENCY = 2  // 并发数
+const CONCURRENCY = 1  // 并发数
 
 // MiniMax API 配置
 const MINIMAX_API_KEY = 'sk-cp-g2f8gf-BF_bd4WkOVvvI8OsEGfYrojAwJ9esutVeRHK-fBDHWj9DDvocvT3lAo5J-RORvlQ7cVi2qLz8XT_9j-TyefbS6HCh4HEUgDc0HDlMzcWdqAZDxcI'
@@ -216,22 +216,62 @@ async function enrich(): Promise<void> {
   const exercises: ProcessedExercise[] = JSON.parse(content)
   console.log(`加载 ${exercises.length} 个动作`)
 
+  // 检查是否有已处理的数据，用于增量处理
+  const processedPath = join(OUTPUT_DIR, 'exercises-processed.json')
+  let existingProcessed: any[] = []
+  let startIndex = 0
+
+  if (existsSync(processedPath)) {
+    try {
+      const processedContent = await readFile(processedPath, 'utf-8')
+      const processedData = JSON.parse(processedContent)
+      if (processedData.exercises && Array.isArray(processedData.exercises)) {
+        existingProcessed = processedData.exercises
+        // 根据已处理的 nameEn 找出起始位置
+        const processedNames = new Set(existingProcessed.map((e: any) => e.nameEn))
+        for (let i = 0; i < exercises.length; i++) {
+          if (!processedNames.has(exercises[i].nameEn)) {
+            startIndex = i
+            break
+          }
+          if (i === exercises.length - 1) {
+            startIndex = exercises.length // 全部处理完了
+          }
+        }
+        console.log(`发现已处理 ${existingProcessed.length} 条，从索引 ${startIndex} 继续`)
+      }
+    } catch (e) {
+      console.warn('读取已处理数据失败，将从头开始')
+    }
+  }
+
+  if (startIndex >= exercises.length) {
+    console.log('所有动作已处理完成!')
+    return
+  }
+
+  const remainingExercises = exercises.slice(startIndex)
+  console.log(`剩余 ${remainingExercises.length} 个动作待处理`)
+
   console.log(`开始AI增强（每批${BATCH_SIZE}个，并发${CONCURRENCY}）...`)
-  const enriched = await enrichAll(exercises, (current, total) => {
+  const enriched = await enrichAll(remainingExercises, (current, total) => {
     process.stdout.write(`\r进度: ${current}/${total}`)
   })
 
   console.log('\n转换最终格式...')
   const final = enriched.map(toFinalExercise)
 
+  // 合并已有数据和新处理的数据
+  const allProcessed = [...existingProcessed, ...final]
+
   // 保存
   await writeFile(
     join(OUTPUT_DIR, 'exercises-processed.json'),
-    JSON.stringify({ exercises: final, generatedAt: new Date().toISOString() }, null, 2),
+    JSON.stringify({ exercises: allProcessed, generatedAt: new Date().toISOString() }, null, 2),
     'utf-8'
   )
 
-  console.log('\nAI增强完成!')
+  console.log(`\nAI增强完成! 本次新增 ${final.length} 条，总计 ${allProcessed.length} 条`)
 }
 
 // 如果直接运行此脚本

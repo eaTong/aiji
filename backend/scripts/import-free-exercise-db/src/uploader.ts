@@ -1,13 +1,70 @@
 import { readdir, readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
-import { existsSync } from 'fs'
+import { existsSync, readdirSync } from 'fs'
+import { config } from 'dotenv'
 import OSS from 'ali-oss'
 import { EnrichedExercise } from './types'
+
+// 加载 .env 文件
+config({ path: join(__dirname, '..', '.env') })
 
 const CWD = process.cwd()
 const DATA_DIR = join(CWD, 'data')
 const OUTPUT_DIR = join(CWD, 'output')
 const CONCURRENCY = 5
+
+/**
+ * 构建 nameEn -> 目录名 的映射
+ */
+function buildNameToDirMapping(): Map<string, string> {
+  const mapping = new Map<string, string>()
+  const imagesDir = join(DATA_DIR, 'images')
+  const entries = readdirSync(imagesDir, { withFileTypes: true })
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      // 目录名就是实际的映射键
+      // 例如: "Adductor_Groin" -> "Adductor_Groin"
+      mapping.set(entry.name, entry.name)
+    }
+  }
+  return mapping
+}
+
+/**
+ * 根据 nameEn 找到匹配的目录名
+ */
+function findMatchingDir(nameEn: string, mapping: Map<string, string>): string | null {
+  // 1. 直接尝试转换空格为下划线
+  const basicTransform = nameEn.replace(/ /g, '_')
+  if (mapping.has(basicTransform)) {
+    return basicTransform
+  }
+
+  // 2. 尝试多种变换
+  const transforms = [
+    nameEn.replace(/[\/\\]/g, '_').replace(/ /g, '_'),           // / -> _
+    nameEn.replace(/[()]/g, '').replace(/ /g, '_'),               // 移除括号
+    nameEn.replace(/[,'-]/g, '').replace(/ /g, '_'),             // 移除特殊字符
+    nameEn.replace(/[()]/g, '').replace(/,/g, '').replace(/ /g, '_').replace(/-/g, '_'),
+  ]
+
+  for (const t of transforms) {
+    if (mapping.has(t)) {
+      return t
+    }
+  }
+
+  // 3. 模糊匹配：查找包含 nameEn 主要部分的目录
+  const normalizedName = nameEn.replace(/[^\w]/g, '').toLowerCase()
+  for (const [dirName] of mapping) {
+    const normalizedDir = dirName.replace(/[^\w]/g, '').toLowerCase()
+    if (normalizedDir.includes(normalizedName) || normalizedName.includes(normalizedDir)) {
+      return dirName
+    }
+  }
+
+  return null
+}
 
 // OSS 配置
 const OSS_CONFIG = {
@@ -52,9 +109,17 @@ async function uploadImage(
  */
 async function uploadExerciseImages(
   client: OSS,
-  exercise: EnrichedExercise
+  exercise: { nameEn: string },
+  nameToDirMapping: Map<string, string>
 ): Promise<string[]> {
-  const imageDir = join(DATA_DIR, 'images', exercise.sourceId)
+  // 查找匹配的目录
+  let imageDirName = findMatchingDir(exercise.nameEn, nameToDirMapping)
+  if (!imageDirName) {
+    console.warn(`图片目录不存在: ${exercise.nameEn}`)
+    return []
+  }
+
+  const imageDir = join(DATA_DIR, 'images', imageDirName)
   const urls: string[] = []
 
   if (!existsSync(imageDir)) {
@@ -70,11 +135,11 @@ async function uploadExerciseImages(
       if (!/\.(jpg|jpeg|png|gif|webp)$/i.test(file)) continue
 
       const localPath = join(imageDir, file)
-      const ossUrl = await uploadImage(client, localPath, exercise.sourceId, file)
+      const ossUrl = await uploadImage(client, localPath, imageDirName, file)
       urls.push(ossUrl)
     }
   } catch (error) {
-    console.warn(`处理图片失败 ${exercise.sourceId}:`, error)
+    console.warn(`处理图片失败 ${exercise.nameEn}:`, error)
   }
 
   return urls
@@ -84,11 +149,15 @@ async function uploadExerciseImages(
  * 批量上传所有图片
  */
 async function uploadAllImages(
-  exercises: EnrichedExercise[],
+  exercises: Array<{ nameEn: string }>,
   onProgress?: (current: number, total: number) => void
 ): Promise<Record<string, string[]>> {
   const client = createOssClient()
   const imageUrls: Record<string, string[]> = {}
+
+  // 构建目录映射
+  const nameToDirMapping = buildNameToDirMapping()
+  console.log(`已加载 ${nameToDirMapping.size} 个图片目录`)
 
   let completed = 0
   const total = exercises.length
@@ -97,10 +166,10 @@ async function uploadAllImages(
     const batch = exercises.slice(i, i + CONCURRENCY)
     const batchResults = await Promise.all(
       batch.map(async (ex) => {
-        const urls = await uploadExerciseImages(client, ex)
+        const urls = await uploadExerciseImages(client, ex, nameToDirMapping)
         completed++
         onProgress?.(completed, total)
-        return { id: ex.sourceId, urls }
+        return { id: ex.nameEn, urls }
       })
     )
 

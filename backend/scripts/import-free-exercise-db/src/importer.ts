@@ -2,7 +2,7 @@ import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
 // @ts-ignore - 使用 backend 的 prisma client
-import { PrismaClient } from '../backend_node_modules/@prisma/client'
+import { PrismaClient } from '../../../node_modules/@prisma/client'
 import { FinalExercise } from './types'
 
 const CWD = process.cwd()
@@ -54,7 +54,24 @@ async function importToDatabase(): Promise<void> {
 
   // 清空现有系统动作的中间表和动作
   console.log('清空现有系统动作...')
+  // PlanExerciseReplacement 有 originalExerciseId/newExerciseId FK，必须先删
+  await prisma.planExerciseReplacement.deleteMany({
+    where: {
+      OR: [
+        { originalExercise: { isCustom: false, userId: null } },
+        { newExercise: { isCustom: false, userId: null } },
+      ],
+    },
+  })
   await prisma.exerciseMuscle.deleteMany({
+    where: {
+      exercise: {
+        isCustom: false,
+        userId: null,
+      },
+    },
+  })
+  await prisma.plannedExercise.deleteMany({
     where: {
       exercise: {
         isCustom: false,
