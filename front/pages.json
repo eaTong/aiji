@@ -1,6 +1,8 @@
 {
   "pages": [
     { "path": "pages/index/index", "style": { "navigationBarTitleText": "AI己" } },
+    { "path": "pages/knowledge/index", "style": { "navigationBarTitleText": "知识库" } },
+    { "path": "pages/knowledge/detail", "style": { "navigationBarTitleText": "文章详情" } },
     { "path": "pages/data/index", "style": { "navigationBarTitleText": "数据中心" } },
     { "path": "pages/data/weight", "style": { "navigationBarTitleText": "体重记录" } },
     { "path": "pages/data/measurements", "style": { "navigationBarTitleText": "围度记录" } },
@@ -26,6 +28,7 @@
     "selectedColor": "#07c160",
     "list": [
       { "pagePath": "pages/index/index", "text": "AI助手", "iconPath": "static/tab_ai.png", "selectedIconPath": "static/tab_ai_selected.png" },
+      { "pagePath": "pages/knowledge/index", "text": "知识库", "iconPath": "static/tab_knowledge.png", "selectedIconPath": "static/tab_knowledge_selected.png" },
       { "pagePath": "pages/data/index", "text": "数据", "iconPath": "static/tab_data.png", "selectedIconPath": "static/tab_data_selected.png" },
       { "pagePath": "pages/training/index", "text": "训练", "iconPath": "static/tab_training.png", "selectedIconPath": "static/tab_training_selected.png" },
       { "pagePath": "pages/profile/index", "text": "我", "iconPath": "static/tab_profile.png", "selectedIconPath": "static/tab_profile_selected.png" }
