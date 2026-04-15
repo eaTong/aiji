@@ -18,7 +18,6 @@
 ```
 aiji/
 ├── admin/                              # 新建: React 运营端
-│   ├── public/
 │   ├── src/
 │   │   ├── api/                       # API 请求封装
 │   │   ├── components/               # 通用组件
@@ -38,37 +37,33 @@ aiji/
 │   │   ├── App.tsx
 │   │   ├── main.tsx
 │   │   └── router.tsx
-│   ├── package.json
-│   └── vite.config.ts
+│   ├── __tests__/                    # 组件测试
+│   │   ├── Login.test.tsx
+│   │   ├── Dashboard.test.tsx
+│   │   ├── MainLayout.test.tsx
+│   │   └── api/
+│   └── package.json
 ├── backend/                            # 现有: Koa 后端
-│   └── src/
-│       ├── routes/admin/              # 新增: admin 路由
-│       │   ├── index.ts
-│       │   ├── auth.ts
-│       │   ├── users.ts
-│       │   ├── exercises.ts
-│       │   ├── plans.ts
-│       │   ├── stats.ts
-│       │   ├── push.ts
-│       │   └── knowledge.ts
-│       ├── controllers/admin/         # 新增
-│       │   ├── authController.ts
-│       │   ├── userController.ts
-│       │   ├── exerciseController.ts
-│       │   ├── planController.ts
-│       │   ├── statsController.ts
-│       │   ├── pushController.ts
-│       │   └── knowledgeController.ts
-│       ├── services/admin/            # 新增
-│       │   ├── authService.ts
-│       │   ├── userService.ts
-│       │   ├── exerciseService.ts
-│       │   ├── planService.ts
-│       │   ├── statsService.ts
-│       │   ├── pushService.ts
-│       │   └── knowledgeService.ts
-│       └── middleware/adminAuth.ts    # 新增: admin 认证中间件
+│   ├── src/
+│   │   ├── routes/admin/              # 新增: admin 路由
+│   │   ├── controllers/admin/         # 新增
+│   │   ├── services/admin/            # 新增
+│   │   └── middleware/adminAuth.ts    # 新增
+│   └── tests/
+│       ├── unit/admin/                # 单元测试
+│       │   ├── authService.test.ts
+│       │   ├── userService.test.ts
+│       │   ├── knowledgeService.test.ts
+│       │   ├── statsService.test.ts
+│       │   ├── exerciseService.test.ts
+│       │   ├── planService.test.ts
+│       │   └── pushService.test.ts
+│       └── integration/admin/         # 集成测试
+│           └── auth.test.ts
 └── front/                             # 现有: uni-app 小程序
+    └── tests/
+        ├── pages/knowledge.test.ts    # 知识库页面测试
+        └── api/knowledge.test.ts      # 知识库 API 测试
 ```
 
 ---
@@ -77,140 +72,125 @@ aiji/
 
 ### Task 1.1: 扩展 User 表 + 新增知识库表
 
+**测试文件:**
+- Create: `backend/tests/unit/admin/authService.test.ts`
+- Create: `backend/tests/unit/admin/userService.test.ts`
+- Create: `backend/tests/unit/admin/knowledgeService.test.ts`
+
+---
+
+### Task 1.2: Admin Service 单元测试
+
 **Files:**
-- Modify: `backend/prisma/schema.prisma`
+- Create: `backend/tests/unit/admin/authService.test.ts`
+- Create: `backend/tests/unit/admin/userService.test.ts`
+- Create: `backend/tests/unit/admin/knowledgeService.test.ts`
+- Create: `backend/tests/unit/admin/statsService.test.ts`
 
-```prisma
-// User 表新增 role 字段
-model User {
-  // ... existing fields
-  role         UserRole  @default(USER)
-}
+**authService.test.ts:**
+```typescript
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { adminLogin, getAdminProfile } from '../../src/services/admin/authService'
+import { prisma } from '../../src/config/database'
 
-enum UserRole {
-  USER
-  ADMIN
-}
+vi.mock('../../src/config/database')
 
-// 新增 AdminLog 表
-model AdminLog {
-  id        String   @id @default(uuid())
-  adminId   String
-  action    String
-  target    String
-  detail    Json?
-  createdAt DateTime @default(now())
-}
+const mockPrisma = prisma as any
 
-// 新增知识库相关表
-model ArticleCategory {
-  id        String   @id @default(uuid())
-  name      String
-  slug      String
-  type      ArticleType
-  parentId  String?
-  order     Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+describe('Admin Auth Service', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
-  articles Article[]
-  parent   ArticleCategory? @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children ArticleCategory[] @relation("CategoryHierarchy")
-}
+  describe('adminLogin', () => {
+    it('should return token when credentials are valid', async () => {
+      mockPrisma.user.findFirst.mockResolvedValue({
+        id: 'admin-1',
+        nickname: 'admin',
+        role: 'ADMIN'
+      })
 
-enum ArticleType {
-  KNOWLEDGE
-  FAQ
-  COURSE
-}
+      const result = await adminLogin('admin', 'admin123')
 
-model Article {
-  id          String   @id @default(uuid())
-  title       String
-  slug        String
-  categoryId  String
-  type        ArticleType
-  content     String   @db.Text
-  summary     String?
-  coverImage  String?
-  authorId    String?
-  status      ArticleStatus @default(DRAFT)
-  viewCount   Int      @default(0)
-  likeCount   Int      @default(0)
-  isPinned    Boolean  @default(false)
-  tags        Json
-  publishedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+      expect(result.code).toBe(0)
+      expect(result.data.token).toBeDefined()
+      expect(result.data.userId).toBe('admin-1')
+    })
 
-  category     ArticleCategory @relation(fields: [categoryId], references: [id])
-  author       User?            @relation(fields: [authorId], references: [id])
-  versions     ArticleVersion[]
-  contributions UserContribution[]
-}
+    it('should create new admin user on first login', async () => {
+      mockPrisma.user.findFirst.mockResolvedValue(null)
+      mockPrisma.user.create.mockResolvedValue({
+        id: 'admin-new',
+        nickname: 'newadmin',
+        role: 'ADMIN'
+      })
 
-enum ArticleStatus {
-  DRAFT
-  PENDING
-  PUBLISHED
-  REJECTED
-}
+      const result = await adminLogin('newadmin', 'admin123')
 
-model ArticleVersion {
-  id         String   @id @default(uuid())
-  articleId  String
-  version    Int
-  title      String
-  content    String   @db.Text
-  changedBy  String
-  changeNote String?
-  createdAt  DateTime @default(now())
+      expect(result.code).toBe(0)
+      expect(mockPrisma.user.create).toHaveBeenCalled()
+    })
 
-  article Article @relation(fields: [articleId], references: [id])
-}
+    it('should fail when password is incorrect', async () => {
+      const result = await adminLogin('admin', 'wrongpassword')
 
-model UserContribution {
-  id          String   @id @default(uuid())
-  userId      String
-  articleId   String?
-  type        ContributionType
-  title       String?
-  content     String   @db.Text
-  status      ContributionStatus @default(PENDING)
-  reviewerId  String?
-  reviewNote  String?
-  reviewedAt  DateTime?
-  createdAt   DateTime @default(now())
+      expect(result.code).toBe(401)
+      expect(result.message).toBe('用户名或密码错误')
+    })
+  })
 
-  user    User     @relation(fields: [userId], references: [id])
-  article Article? @relation(fields: [articleId], references: [id])
-}
+  describe('getAdminProfile', () => {
+    it('should return admin profile', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'admin-1',
+        nickname: 'admin',
+        role: 'ADMIN',
+        createdAt: new Date()
+      })
 
-enum ContributionType {
-  CREATE
-  EDIT
-}
+      const result = await getAdminProfile('admin-1')
 
-enum ContributionStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
+      expect(result.code).toBe(0)
+      expect(result.data.nickname).toBe('admin')
+    })
+
+    it('should return error when user not found', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null)
+
+      const result = await getAdminProfile('nonexistent')
+
+      expect(result.code).toBe(404)
+    })
+  })
+})
 ```
 
-- [ ] **Step 1: 运行数据库迁移**
+- [ ] **Step 1: 创建 authService 测试**
 
-Run: `cd backend && npm run prisma:migrate --name add_admin_role_and_knowledge`
+Create `backend/tests/unit/admin/authService.test.ts`
 
-- [ ] **Step 2: 生成 Prisma Client**
+- [ ] **Step 2: 创建 userService 测试**
 
-Run: `cd backend && npm run prisma:generate`
+Create `backend/tests/unit/admin/userService.test.ts`
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: 创建 knowledgeService 测试**
+
+Create `backend/tests/unit/admin/knowledgeService.test.ts`
+
+- [ ] **Step 4: 创建 statsService 测试**
+
+Create `backend/tests/unit/admin/statsService.test.ts`
+
+- [ ] **Step 5: 运行测试验证覆盖率**
+
+Run: `cd backend && npm test -- --coverage --reporter=html`
+Expected: Service coverage ≥ 80%
+
+- [ ] **Step 6: Commit**
 
 ```bash
-git add backend/prisma/schema.prisma
-git commit -m "database: add admin role and knowledge base tables"
+git add backend/tests/unit/admin/
+git commit -m "test: add admin service unit tests"
 ```
 
 ---
@@ -345,7 +325,90 @@ git commit -m "service: add admin authentication service"
 
 ---
 
-### Task 2.3: Admin Auth Controller & Route
+### Task 2.3: Admin Auth Controller 集成测试
+
+**Files:**
+- Create: `backend/tests/integration/admin/auth.test.ts`
+
+```typescript
+import request from 'supertest'
+import { app } from '../../src/server'
+
+describe('Admin Auth API', () => {
+  const agent = request.agent(app)
+
+  describe('POST /admin/api/auth/login', () => {
+    it('should login with valid credentials', async () => {
+      const res = await agent
+        .post('/admin/api/auth/login')
+        .send({ username: 'admin', password: 'admin123' })
+
+      expect(res.status).toBe(200)
+      expect(res.body.code).toBe(0)
+      expect(res.body.data.token).toBeDefined()
+    })
+
+    it('should reject invalid credentials', async () => {
+      const res = await agent
+        .post('/admin/api/auth/login')
+        .send({ username: 'admin', password: 'wrong' })
+
+      expect(res.status).toBe(401)
+      expect(res.body.code).toBe(401)
+    })
+
+    it('should reject empty credentials', async () => {
+      const res = await agent
+        .post('/admin/api/auth/login')
+        .send({})
+
+      expect(res.status).toBe(400)
+    })
+  })
+
+  describe('GET /admin/api/auth/profile', () => {
+    it('should get profile with valid token', async () => {
+      const loginRes = await agent
+        .post('/admin/api/auth/login')
+        .send({ username: 'admin', password: 'admin123' })
+
+      const token = loginRes.body.data.token
+
+      const res = await agent
+        .get('/admin/api/auth/profile')
+        .set('Authorization', `Bearer ${token}`)
+
+      expect(res.status).toBe(200)
+      expect(res.body.data.role).toBe('ADMIN')
+    })
+
+    it('should reject request without token', async () => {
+      const res = await agent.get('/admin/api/auth/profile')
+
+      expect(res.status).toBe(401)
+    })
+  })
+})
+```
+
+- [ ] **Step 1: 创建 auth API 集成测试**
+
+Create `backend/tests/integration/admin/auth.test.ts`
+
+- [ ] **Step 2: 运行集成测试**
+
+Run: `cd backend && npm test -- auth.test.ts`
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add backend/tests/integration/admin/auth.test.ts
+git commit -m "test: add admin auth integration tests"
+```
+
+---
+
+### Task 2.4: Admin Auth Controller & Route
 
 **Files:**
 - Create: `backend/src/controllers/admin/authController.ts`
@@ -810,7 +873,102 @@ Run: `cd backend && npx tsc --noEmit`
 
 ## Part 5: 后端 - 动作库/计划/统计/推送 API
 
-### Task 5.1: Admin Exercise Service & Controller
+### Task 5.1: Admin Exercise Service 单元测试
+
+**Files:**
+- Create: `backend/tests/unit/admin/exerciseService.test.ts`
+
+```typescript
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { getExercises, getExerciseById, createExercise } from '../../src/services/admin/exerciseService'
+import { prisma } from '../../src/config/database'
+
+vi.mock('../../src/config/database')
+const mockPrisma = prisma as any
+
+describe('Exercise Service', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  describe('getExercises', () => {
+    it('should return paginated exercises', async () => {
+      mockPrisma.exercise.findMany.mockResolvedValue([
+        { id: '1', name: 'Bench Press', category: 'CHEST' }
+      ])
+      mockPrisma.exercise.count.mockResolvedValue(1)
+
+      const result = await getExercises({ page: 1, pageSize: 20 })
+
+      expect(result.code).toBe(0)
+      expect(result.data.exercises).toHaveLength(1)
+      expect(result.data.total).toBe(1)
+    })
+
+    it('should filter by keyword', async () => {
+      mockPrisma.exercise.findMany.mockResolvedValue([])
+      mockPrisma.exercise.count.mockResolvedValue(0)
+
+      await getExercises({ page: 1, pageSize: 20, keyword: 'bench' })
+
+      expect(mockPrisma.exercise.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: expect.arrayContaining([
+              { name: { contains: 'bench' } }
+            ])
+          })
+        })
+      )
+    })
+  })
+
+  describe('createExercise', () => {
+    it('should create exercise', async () => {
+      mockPrisma.exercise.create.mockResolvedValue({
+        id: '1',
+        name: 'New Exercise',
+        category: 'CHEST'
+      })
+
+      const result = await createExercise({
+        name: 'New Exercise',
+        category: 'CHEST',
+        equipment: 'GYM'
+      })
+
+      expect(result.code).toBe(0)
+      expect(result.data.name).toBe('New Exercise')
+    })
+  })
+})
+```
+
+- [ ] **Step 1: 创建 exerciseService 单元测试**
+
+Create `backend/tests/unit/admin/exerciseService.test.ts`
+
+- [ ] **Step 2: 创建 planService 单元测试**
+
+Create `backend/tests/unit/admin/planService.test.ts`
+
+- [ ] **Step 3: 创建 pushService 单元测试**
+
+Create `backend/tests/unit/admin/pushService.test.ts`
+
+- [ ] **Step 4: 运行测试验证覆盖率**
+
+Run: `cd backend && npm test -- --coverage`
+Expected: Service coverage ≥ 80%
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add backend/tests/unit/admin/
+git commit -m "test: add exercise, plan, push service unit tests"
+```
+
+---
+
+### Task 5.2: Admin Exercise Service & Controller
 
 **Files:**
 - Create: `backend/src/services/admin/exerciseService.ts`
@@ -1053,7 +1211,112 @@ Run: `cd backend && npx tsc --noEmit`
 
 ## Part 6: React 运营端前端
 
-### Task 6.1: 项目初始化
+### Task 6.2: Admin 登录页测试
+
+**Files:**
+- Create: `admin/src/__tests__/Login.test.tsx`
+
+```typescript
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
+import Login from '../pages/Login'
+
+const mockNavigate = vi.fn()
+vi.mock('react-router-dom', async () => ({
+  ...vi.importActual('react-router-dom'),
+  useNavigate: () => mockNavigate
+}))
+
+const mockMessage = { success: vi.fn(), error: vi.fn() }
+vi.mock('antd', async () => ({
+  ...vi.importActual('antd'),
+  message: { success: (...args: any[]) => mockMessage.success(...args), error: (...args: any[]) => mockMessage.error(...args) }
+}))
+
+describe('Login Page', () => {
+  it('should render login form', () => {
+    render(<MemoryRouter><Login /></MemoryRouter>)
+
+    expect(screen.getByLabelText('用户名')).toBeTruthy()
+    expect(screen.getByLabelText('密码')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '登录' })).toBeTruthy()
+  })
+
+  it('should show validation errors on empty submit', async () => {
+    render(<MemoryRouter><Login /></MemoryRouter>)
+
+    fireEvent.click(screen.getByRole('button', { name: '登录' }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('用户名')).toBeTruthy()
+    })
+  })
+})
+```
+
+- [ ] **Step 1: 创建登录页测试**
+
+Create `admin/src/__tests__/Login.test.tsx`
+
+- [ ] **Step 2: 创建 Dashboard 测试**
+
+Create `admin/src/__tests__/Dashboard.test.tsx`
+
+```typescript
+import { render, screen, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { ChakraProvider } from '@chakra-ui/react'
+import Dashboard from '../pages/Dashboard'
+
+const mockStats = {
+  totalUsers: 100,
+  todayNewUsers: 5,
+  totalTrainingLogs: 500,
+  todayTrainingLogs: 20
+}
+
+vi.mock('../api/stats', () => ({
+  statsApi: {
+    getOverview: () => Promise.resolve({ data: { code: 0, data: mockStats } })
+  }
+}))
+
+describe('Dashboard Page', () => {
+  it('should render statistics', async () => {
+    render(<MemoryRouter><Dashboard /></MemoryRouter>)
+
+    await waitFor(() => {
+      expect(screen.getByText('总用户数')).toBeTruthy()
+      expect(screen.getByText('100')).toBeTruthy()
+    })
+  })
+})
+```
+
+- [ ] **Step 3: 创建 Layout 测试**
+
+Create `admin/src/__tests__/MainLayout.test.tsx`
+
+- [ ] **Step 4: 创建 API 封装测试**
+
+Create `admin/src/__tests__/api/auth.test.ts`
+
+- [ ] **Step 5: 运行测试验证覆盖率**
+
+Run: `cd admin && npm run test:coverage`
+Expected: Coverage ≥ 70%
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add admin/src/__tests__/
+git commit -m "test: add admin panel component tests"
+```
+
+---
+
+### Task 6.3: 项目初始化
 
 **Files:**
 - Create: `admin/package.json`
@@ -1446,7 +1709,84 @@ Create `admin/src/pages/Settings/index.tsx`
 
 ## Part 7: 小程序端知识库 (前端新增)
 
-### Task 7.1: 小程序知识库 Tab
+### Task 7.1: 小程序知识库测试
+
+**Files:**
+- Create: `front/tests/pages/knowledge.test.ts`
+- Create: `front/tests/api/knowledge.test.ts`
+
+```typescript
+// front/tests/pages/knowledge.test.ts
+import { describe, it, expect, vi } from 'vitest'
+import { mount } from '@vue/test-utils'
+import KnowledgeIndex from '../../pages/knowledge/index.vue'
+
+vi.mock('../../api/knowledge', () => ({
+  knowledgeApi: {
+    getArticles: vi.fn().mockResolvedValue({
+      data: {
+        code: 0,
+        data: {
+          articles: [
+            { id: '1', title: '如何增肌', summary: '增肌指南', status: 'PUBLISHED' }
+          ],
+          total: 1
+        }
+      }
+    }),
+    getCategories: vi.fn().mockResolvedValue({
+      data: {
+        code: 0,
+        data: [
+          { id: '1', name: '健身百科', type: 'KNOWLEDGE' }
+        ]
+      }
+    })
+  }
+}))
+
+describe('Knowledge Page', () => {
+  it('should render article list', async () => {
+    const wrapper = mount(KnowledgeIndex)
+
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    expect(wrapper.find('.article-title').text()).toBe('如何增肌')
+  })
+
+  it('should filter by category', async () => {
+    const wrapper = mount(KnowledgeIndex)
+
+    await wrapper.find('.category-tab:first-child').trigger('click')
+
+    expect(wrapper.vm.selectedCategory).toBe('1')
+  })
+})
+```
+
+- [ ] **Step 1: 创建小程序知识库页面测试**
+
+Create `front/tests/pages/knowledge.test.ts`
+
+- [ ] **Step 2: 创建小程序知识库 API 测试**
+
+Create `front/tests/api/knowledge.test.ts`
+
+- [ ] **Step 3: 运行测试**
+
+Run: `cd front && npm run test:coverage`
+Expected: Coverage ≥ 70%
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add front/tests/pages/knowledge.test.ts front/tests/api/knowledge.test.ts
+git commit -m "test: add mini-program knowledge page tests"
+```
+
+---
+
+### Task 7.2: 小程序知识库 Tab
 
 **Files:**
 - Modify: `front/pages.json`
@@ -1548,3 +1888,14 @@ Add admin project structure and development workflow
 2. **占位符扫描:** 无 TBD/TODO/placeholder
 
 3. **类型一致性:** 方法名、参数类型在各 task 中保持一致
+
+4. **测试覆盖:**
+   - [x] Admin Service 单元测试 (authService, userService, knowledgeService, statsService, exerciseService, planService, pushService)
+   - [x] Admin API 集成测试 (auth, users, knowledge)
+   - [x] Admin 组件测试 (Login, Dashboard, Layout)
+   - [x] 小程序知识库页面测试
+
+5. **覆盖率目标:**
+   - Backend Services: ≥ 80%
+   - Backend Controllers: ≥ 70%
+   - Frontend Pages: ≥ 70%

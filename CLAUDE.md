@@ -206,17 +206,20 @@ Pages → Components/API
 ## 测试规范
 
 ### 测试文件位置
-- 后端: `backend/tests/*.test.ts`
+- 后端: `backend/tests/**/*.test.ts`
+  - 单元测试: `backend/tests/unit/admin/`
+  - 集成测试: `backend/tests/integration/admin/`
 - 前端: `front/tests/**/*.test.ts`
+- 运营端: `admin/src/__tests__/`
 
 ### 测试覆盖目标
 | 模块 | 覆盖率目标 |
 |------|-----------|
-| Services | ≥ 80% |
-| Controllers | ≥ 70% |
-| Utils | ≥ 90% |
-| API 层 | ≥ 70% |
-| Store | ≥ 70% |
+| Backend Services | ≥ 80% |
+| Backend Controllers | ≥ 70% |
+| Admin API | ≥ 70% |
+| Admin Pages/Components | ≥ 70% |
+| Front Pages | ≥ 70% |
 
 ### 提交前检查
 - [ ] 后端测试通过 (`npm test`)
